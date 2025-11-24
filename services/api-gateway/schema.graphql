@@ -1,0 +1,302 @@
+# GraphQL Schema - Plataforma de Pedidos en Tiempo Real
+
+"""
+Usuario del sistema (cliente, dueño de restaurante, repartidor)
+"""
+type User {
+  id: ID!
+  email: String!
+  name: String!
+  phone: String
+  role: UserRole!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+enum UserRole {
+  CUSTOMER
+  RESTAURANT_OWNER
+  DELIVERY_PERSON
+  ADMIN
+}
+
+"""
+Restaurante
+"""
+type Restaurant {
+  id: ID!
+  name: String!
+  description: String
+  address: Address!
+  phone: String!
+  email: String
+  cuisineType: String!
+  rating: Float
+  isActive: Boolean!
+  owner: User!
+  menu: [MenuItem!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+Dirección física
+"""
+type Address {
+  street: String!
+  city: String!
+  state: String!
+  zipCode: String!
+  country: String!
+  coordinates: Coordinates
+}
+
+"""
+Coordenadas geográficas
+"""
+type Coordinates {
+  latitude: Float!
+  longitude: Float!
+}
+
+"""
+Item del menú de un restaurante
+"""
+type MenuItem {
+  id: ID!
+  name: String!
+  description: String
+  price: Float!
+  category: String!
+  imageUrl: String
+  isAvailable: Boolean!
+  restaurant: Restaurant!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+Pedido
+"""
+type Order {
+  id: ID!
+  customer: User!
+  restaurant: Restaurant!
+  items: [OrderItem!]!
+  status: OrderStatus!
+  totalAmount: Float!
+  deliveryAddress: Address!
+  deliveryPerson: DeliveryPerson
+  estimatedDeliveryTime: Int
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+Item dentro de un pedido
+"""
+type OrderItem {
+  id: ID!
+  menuItem: MenuItem!
+  quantity: Int!
+  price: Float!
+  subtotal: Float!
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+"""
+Repartidor
+"""
+type DeliveryPerson {
+  id: ID!
+  user: User!
+  vehicleType: VehicleType!
+  licensePlate: String
+  isAvailable: Boolean!
+  currentLocation: Coordinates
+  rating: Float
+  totalDeliveries: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+enum VehicleType {
+  BICYCLE
+  MOTORCYCLE
+  CAR
+  WALKING
+}
+
+"""
+Autenticación
+"""
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
+"""
+Respuesta de paginación
+"""
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+# Queries
+
+type Query {
+  # Usuario
+  me: User
+  
+  # Restaurantes
+  restaurants(
+    city: String
+    cuisineType: String
+    limit: Int = 20
+    offset: Int = 0
+  ): [Restaurant!]!
+  restaurant(id: ID!): Restaurant
+  
+  # Pedidos
+  orders(
+    status: OrderStatus
+    limit: Int = 20
+    offset: Int = 0
+  ): [Order!]!
+  order(id: ID!): Order
+  
+  # Repartidores
+  availableDeliveryPersons(
+    latitude: Float!
+    longitude: Float!
+    radius: Float = 5.0
+  ): [DeliveryPerson!]!
+  deliveryPerson(id: ID!): DeliveryPerson
+}
+
+# Mutations
+
+type Mutation {
+  # Autenticación
+  register(
+    email: String!
+    password: String!
+    name: String!
+    phone: String
+    role: UserRole!
+  ): AuthPayload!
+  login(email: String!, password: String!): AuthPayload!
+  
+  # Restaurantes
+  createRestaurant(input: CreateRestaurantInput!): Restaurant!
+  updateRestaurant(id: ID!, input: UpdateRestaurantInput!): Restaurant!
+  createMenuItem(restaurantId: ID!, input: CreateMenuItemInput!): MenuItem!
+  updateMenuItem(id: ID!, input: UpdateMenuItemInput!): MenuItem!
+  
+  # Pedidos
+  createOrder(input: CreateOrderInput!): Order!
+  updateOrderStatus(id: ID!, status: OrderStatus!): Order!
+  cancelOrder(id: ID!): Order!
+  
+  # Repartidores
+  updateDeliveryPersonLocation(
+    latitude: Float!
+    longitude: Float!
+  ): DeliveryPerson!
+  acceptOrder(orderId: ID!): Order!
+  updateOrderDeliveryStatus(
+    orderId: ID!
+    status: OrderStatus!
+  ): Order!
+}
+
+# Subscriptions
+
+type Subscription {
+  # Notificaciones en tiempo real
+  orderStatusChanged(orderId: ID!): Order!
+  newOrder(restaurantId: ID!): Order!
+  availableOrders: Order!
+}
+
+# Input Types
+
+input CreateRestaurantInput {
+  name: String!
+  description: String
+  address: AddressInput!
+  phone: String!
+  email: String
+  cuisineType: String!
+}
+
+input UpdateRestaurantInput {
+  name: String
+  description: String
+  address: AddressInput
+  phone: String
+  email: String
+  cuisineType: String
+  isActive: Boolean
+}
+
+input AddressInput {
+  street: String!
+  city: String!
+  state: String!
+  zipCode: String!
+  country: String!
+  coordinates: CoordinatesInput
+}
+
+input CoordinatesInput {
+  latitude: Float!
+  longitude: Float!
+}
+
+input CreateMenuItemInput {
+  name: String!
+  description: String
+  price: Float!
+  category: String!
+  imageUrl: String
+}
+
+input UpdateMenuItemInput {
+  name: String
+  description: String
+  price: Float
+  category: String
+  imageUrl: String
+  isAvailable: Boolean
+}
+
+input CreateOrderInput {
+  restaurantId: ID!
+  items: [OrderItemInput!]!
+  deliveryAddress: AddressInput!
+}
+
+input OrderItemInput {
+  menuItemId: ID!
+  quantity: Int!
+}
+
+# Scalar Types
+
+scalar DateTime
+

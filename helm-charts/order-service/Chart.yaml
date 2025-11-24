@@ -1,0 +1,13 @@
+apiVersion: v2
+name: order-service
+description: Helm chart for Order Service microservice
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - microservice
+  - graphql
+  - orders
+maintainers:
+  - name: Food Delivery Platform Team
+
