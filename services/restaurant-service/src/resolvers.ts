@@ -1,10 +1,39 @@
 import { RestaurantService } from './services/restaurant.service';
 import { logger } from './utils/logger';
 
+interface UserContext {
+  userId: string;
+  email?: string;
+  role?: string;
+}
+
+interface Context {
+  user: UserContext | null;
+}
+
 let restaurantService: RestaurantService;
 
 export function initializeResolvers(service: RestaurantService) {
   restaurantService = service;
+}
+
+function requireAuth(context: Context): UserContext {
+  if (!context.user) {
+    throw new Error('Not authenticated');
+  }
+  return context.user;
+}
+
+async function requireRestaurantOwner(restaurantId: string, user: UserContext): Promise<void> {
+  if (user.role === 'ADMIN') return;
+
+  const restaurant = await restaurantService.getRestaurantById(restaurantId);
+  if (!restaurant) {
+    throw new Error('Restaurant not found');
+  }
+  if (restaurant.ownerId !== user.userId) {
+    throw new Error('Not authorized: only the restaurant owner can perform this action');
+  }
 }
 
 export const resolvers = {
@@ -35,43 +64,59 @@ export const resolvers = {
     },
   },
   Mutation: {
-    createRestaurant: async (_parent: any, args: any) => {
-      logger.info('Mutation: createRestaurant', args);
-      return restaurantService.createRestaurant(args);
+    createRestaurant: async (_parent: any, args: any, context: Context) => {
+      const user = requireAuth(context);
+      if (user.role !== 'RESTAURANT_OWNER' && user.role !== 'ADMIN') {
+        throw new Error('Not authorized: only restaurant owners can create restaurants');
+      }
+      logger.info('Mutation: createRestaurant', { userId: user.userId });
+      // Force ownerId to authenticated user
+      return restaurantService.createRestaurant({ ...args, ownerId: user.userId });
     },
-    updateRestaurant: async (_parent: any, args: any) => {
-      logger.info('Mutation: updateRestaurant', args);
+    updateRestaurant: async (_parent: any, args: any, context: Context) => {
+      const user = requireAuth(context);
+      await requireRestaurantOwner(args.id, user);
+      logger.info('Mutation: updateRestaurant', { id: args.id, userId: user.userId });
       const result = await restaurantService.updateRestaurant(args);
       if (!result) {
         throw new Error('Restaurant not found');
       }
       return result;
     },
-    deleteRestaurant: async (_parent: any, args: { id: string }) => {
-      logger.info('Mutation: deleteRestaurant', args);
+    deleteRestaurant: async (_parent: any, args: { id: string }, context: Context) => {
+      const user = requireAuth(context);
+      await requireRestaurantOwner(args.id, user);
+      logger.info('Mutation: deleteRestaurant', { id: args.id, userId: user.userId });
       return restaurantService.deleteRestaurant(args.id);
     },
-    createMenuItem: async (_parent: any, args: any) => {
-      logger.info('Mutation: createMenuItem', args);
+    createMenuItem: async (_parent: any, args: any, context: Context) => {
+      const user = requireAuth(context);
+      await requireRestaurantOwner(args.restaurantId, user);
+      logger.info('Mutation: createMenuItem', { restaurantId: args.restaurantId, userId: user.userId });
       return restaurantService.createMenuItem(args);
     },
-    updateMenuItem: async (_parent: any, args: any) => {
-      logger.info('Mutation: updateMenuItem', args);
+    updateMenuItem: async (_parent: any, args: any, context: Context) => {
+      const user = requireAuth(context);
+      const item = await restaurantService.getMenuItemById(args.id);
+      if (!item) throw new Error('Menu item not found');
+      await requireRestaurantOwner(item.restaurantId, user);
+      logger.info('Mutation: updateMenuItem', { id: args.id, userId: user.userId });
       const result = await restaurantService.updateMenuItem(args);
-      if (!result) {
-        throw new Error('Menu item not found');
-      }
+      if (!result) throw new Error('Menu item not found');
       return result;
     },
-    deleteMenuItem: async (_parent: any, args: { id: string }) => {
-      logger.info('Mutation: deleteMenuItem', args);
+    deleteMenuItem: async (_parent: any, args: { id: string }, context: Context) => {
+      const user = requireAuth(context);
+      const item = await restaurantService.getMenuItemById(args.id);
+      if (!item) throw new Error('Menu item not found');
+      await requireRestaurantOwner(item.restaurantId, user);
+      logger.info('Mutation: deleteMenuItem', { id: args.id, userId: user.userId });
       return restaurantService.deleteMenuItem(args.id);
     },
   },
   Subscription: {
     restaurantStatusChanged: {
       subscribe: () => {
-        // TODO: Implement with PubSub or Redis
         logger.warn('Subscription not implemented yet');
         return { [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => ({ done: true, value: undefined })) }) };
       },

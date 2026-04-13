@@ -83,7 +83,16 @@ async function startServer() {
     '/graphql',
     cors(),
     express.json(),
-    expressMiddleware(server)
+    expressMiddleware(server, {
+      context: async ({ req }) => {
+        const userId = req.headers['x-user-id'] as string | undefined;
+        const email = req.headers['x-user-email'] as string | undefined;
+        const role = req.headers['x-user-role'] as string | undefined;
+        return {
+          user: userId ? { userId, email, role } : null,
+        };
+      },
+    })
   );
 
   await httpServer.listen({ port: PORT });
