@@ -7,10 +7,12 @@ import { buildSubgraphSchema } from '@apollo/subgraph';
 import cors from 'cors';
 import http from 'http';
 import { Pool } from 'pg';
+import { parse } from 'graphql';
 import { logger } from './utils/logger';
 import { typeDefs } from './schema';
 import { resolvers, initializeResolvers } from './resolvers';
 import { RestaurantService } from './services/restaurant.service';
+import { RestaurantKafkaProducer } from './events/kafka.producer';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,11 +22,15 @@ const dbPool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// Kafka producer
+const kafkaProducer = new RestaurantKafkaProducer();
+
 // Initialize service
 const restaurantService = new RestaurantService(
   dbPool,
   process.env.REDIS_URL || 'redis://localhost:6379',
-  parseInt(process.env.CACHE_TTL || '300')
+  parseInt(process.env.CACHE_TTL || '300'),
+  kafkaProducer
 );
 
 // Health check endpoint
@@ -60,12 +66,13 @@ app.get('/health', async (req, res) => {
 // Apollo Server
 async function startServer() {
   await restaurantService.initialize();
+  await kafkaProducer.connect();
   initializeResolvers(restaurantService);
 
   const httpServer = http.createServer(app);
 
   const server = new ApolloServer({
-    schema: buildSubgraphSchema([{ typeDefs, resolvers }]),
+    schema: buildSubgraphSchema([{ typeDefs: parse(typeDefs), resolvers }]),
     plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
     introspection: process.env.NODE_ENV !== 'production',
   });

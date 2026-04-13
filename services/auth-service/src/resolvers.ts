@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import { AuthService } from './services/auth.service';
 import { getAuthContext, AuthContext, verifyToken, generateToken, generateRefreshToken } from './middleware/auth';
+import { blacklistToken, checkLoginRateLimit, resetLoginRateLimit } from './services/redis.service';
 import { logger } from './utils/logger';
 
 let authService: AuthService;
@@ -45,20 +46,43 @@ export const resolvers = {
         throw error;
       }
     },
-    login: async (_parent: any, args: any) => {
+    login: async (_parent: any, args: any, context: any) => {
       logger.info('Login mutation called', { email: args.email });
-      
+
+      const ip = context.ip || 'unknown';
+      const rateKey = `${ip}:${args.email}`;
+      const rateCheck = await checkLoginRateLimit(rateKey);
+
+      if (!rateCheck.allowed) {
+        logger.warn('Login rate limit exceeded', { email: args.email, ip });
+        throw new Error(`Too many login attempts. Try again in ${rateCheck.retryAfter} seconds.`);
+      }
+
       try {
         const result = await authService.login({
           email: args.email,
           password: args.password,
         });
 
+        await resetLoginRateLimit(rateKey);
         return result;
       } catch (error) {
         logger.error('Login failed', { error: (error as Error).message });
         throw error;
       }
+    },
+    logout: async (_parent: any, _args: any, context: { auth: AuthContext & { token?: string } }) => {
+      if (!context.auth.user || !context.auth.token) {
+        throw new Error('Not authenticated');
+      }
+
+      const decoded = context.auth.user;
+      if (decoded.exp) {
+        await blacklistToken(context.auth.token, decoded.exp);
+      }
+
+      logger.info('User logged out', { userId: decoded.userId });
+      return true;
     },
     refreshToken: async (_parent: any, args: any) => {
       logger.info('Refresh token mutation called');

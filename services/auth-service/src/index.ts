@@ -8,10 +8,12 @@ import cors from 'cors';
 import http from 'http';
 import { Pool } from 'pg';
 import { createClient } from 'redis';
+import { parse } from 'graphql';
 import { logger } from './utils/logger';
 import { typeDefs } from './schema';
 import { resolvers, initializeResolvers } from './resolvers';
 import { getAuthContext, AuthContext } from './middleware/auth';
+import { initializeRedis } from './services/redis.service';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -32,6 +34,7 @@ redisClient.on('connect', () => logger.info('Redis connected'));
 (async () => {
   try {
     await redisClient.connect();
+    initializeRedis(redisClient as any);
   } catch (error) {
     logger.warn('Failed to connect to Redis, continuing without it', { error: (error as Error).message });
   }
@@ -75,7 +78,7 @@ async function startServer() {
   const httpServer = http.createServer(app);
 
   const server = new ApolloServer({
-    schema: buildSubgraphSchema([{ typeDefs, resolvers }]),
+    schema: buildSubgraphSchema([{ typeDefs: parse(typeDefs), resolvers }]),
     plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
     introspection: process.env.NODE_ENV !== 'production',
   });
@@ -89,7 +92,8 @@ async function startServer() {
     expressMiddleware(server, {
       context: async ({ req }) => {
         const auth = await getAuthContext(req.headers.authorization);
-        return { auth };
+        const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+        return { auth, ip };
       },
     })
   );

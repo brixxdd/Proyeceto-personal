@@ -1,5 +1,6 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { logger } from '../utils/logger';
+import { isTokenBlacklisted } from '../services/redis.service';
 
 export interface JwtPayload {
   userId: string;
@@ -40,16 +41,22 @@ export function generateRefreshToken(payload: { userId: string; email: string; r
   } as SignOptions);
 }
 
-export async function getAuthContext(authorization?: string): Promise<AuthContext> {
+export async function getAuthContext(authorization?: string): Promise<AuthContext & { token?: string }> {
   if (!authorization) {
     return { user: null };
   }
 
   const token = authorization.replace('Bearer ', '');
-  
+
   try {
+    const blacklisted = await isTokenBlacklisted(token);
+    if (blacklisted) {
+      logger.warn('Blacklisted token used');
+      return { user: null };
+    }
+
     const user = verifyToken(token);
-    return { user };
+    return { user, token };
   } catch (error) {
     logger.warn('Invalid token', { error: (error as Error).message });
     return { user: null };

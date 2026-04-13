@@ -6,6 +6,7 @@ export const typeDefs = `#graphql
   extend type Mutation {
     register(email: String!, password: String!, name: String!, phone: String, role: UserRole!): AuthPayload!
     login(email: String!, password: String!): AuthPayload!
+    logout: Boolean!
     refreshToken(refreshToken: String!): TokenPayload!
   }
 

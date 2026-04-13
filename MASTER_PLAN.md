@@ -1,19 +1,19 @@
 # 🎯 MASTER PLAN — Plataforma de Pedidos en Tiempo Real
 
-> **Progreso Total: ~41%** | Última actualización: 2026-04-12
+> **Progreso Total: ~42%** | Última actualización: 2026-04-13
 >
-> Documento único que converge: ROADMAP, IMPLEMENTATION_STATUS, PRIORITY_PLAN, NEXT_STEPS, QUICK_START, LA_VISION, PROJECT_STRUCTURE
+> Converge: ROADMAP, IMPLEMENTATION_STATUS, PRIORITY_PLAN, NEXT_STEPS, QUICK_START, LA_VISION, PROJECT_STRUCTURE
 
 ---
 
 ## 🚀 Visión del Proyecto
 
-Plataforma cloud-native distribuida y escalable inspirada en Uber Eats, con arquitectura de microservicios, eventos asíncronos, GraphQL federado, CI/CD automático y observabilidad completa.
+Plataforma cloud-native distribuida, escalable. Inspirada en Uber Eats. Microservicios, eventos asíncronos, GraphQL federado, CI/CD automático, observabilidad completa.
 
 ### ¿Por qué este proyecto?
 
-- **Diferenciación total**: El 95% de devs llegan con CRUDs básicos. Tú llegas con arquitectura de producción real.
-- **Portafolio premium**: Demuestras habilidades de nivel Mid/Senior (solo 2% de devs saben esto).
+- **Diferenciación total**: 95% devs llegan con CRUDs básicos. Tú llegas con arquitectura de producción real.
+- **Portafolio premium**: Nivel Mid/Senior (solo 2% devs saben esto).
 - **Aprendizaje brutal**: Microservicios + Kafka + Kubernetes + CI/CD + observabilidad = perfil senior real.
 
 ---
@@ -24,10 +24,10 @@ Plataforma cloud-native distribuida y escalable inspirada en Uber Eats, con arqu
 |------------|----------|--------|-------|
 | **Infraestructura Terraform** | 100% | ✅ Completo | VPC, EKS, RDS, MSK, ElastiCache |
 | **Helm Charts** | ~17% | 🚧 Parcial | Solo order-service |
-| **order-service** | ~85% | 🚧 Casi listo | Código sólido, sin tests, auth JWT stub, precio hardcodeado |
+| **order-service** | ~87% | 🚧 Casi listo | Apollo Federation v2 integrado (`buildSubgraphSchema`, `@apollo/subgraph`), sin tests, auth JWT stub, precio hardcodeado |
 | **auth-service** | ~60% | 🚧 Avanzando | Tests completos (100% coverage), register/login con bcrypt+JWT, falta Redis blacklist y rate limiting |
 | **restaurant-service** | ~55% | 🚧 Avanzando | CRUD completo con cache Redis, migraciones, **tests completos (61 tests, ~90% coverage)**, sin auth ni Kafka |
-| **api-gateway** | ~40% | 🚧 Avanzando | 3 subgraphs configurados (auth, restaurant, order), rate limiting con Redis, health check completo, **tests (22 tests, 100% coverage auth)** |
+| **api-gateway** | ~50% | 🚧 Avanzando | Federation funcionando con los 3 subgraphs ✅, rate limiting con Redis, health check completo, **tests (22 tests, 100% coverage auth)** |
 | **delivery-service** | 0% | 📋 Pendiente | No existe |
 | **notification-service** | 0% | 📋 Pendiente | No existe |
 | **CI/CD** | ~17% | 🚧 Parcial | Solo order-service (lint, test, build, security, deploy) |
@@ -160,44 +160,44 @@ service-name/
 
 - [x] **1.1.1** Instalar dependencias: `cd services/order-service && npm install` ✅
 - [ ] **1.1.2** Crear `.env` desde `env.example` con valores locales
-- [x] **1.1.3** Implementar GraphQL Subscriptions reales (Redis PubSub o `graphql-ws`) ✅ Redis PubSub implementado
-- [x] **1.1.4** Implementar validación JWT real (middleware que decode token del header) ✅ Stub JWT implementado
+- [x] **1.1.3** GraphQL Subscriptions reales (Redis PubSub o `graphql-ws`) ✅ Redis PubSub implementado
+- [x] **1.1.4** Validación JWT real (middleware que decode token del header) ✅ Stub JWT implementado
 - [ ] **1.1.5** Validar precios consultando restaurant-service antes de crear order
-- [x] **1.1.6** Implementar idempotencia en eventos Kafka (tracking de event IDs en Redis) ✅ Idempotency service creada
+- [x] **1.1.6** Idempotencia en eventos Kafka (tracking de event IDs en Redis) ✅ Idempotency service creada
 - [ ] **1.1.7** Crear directorio `migrations/` y migrar de inline a `node-pg-migrate`
-- [x] **1.1.8** Agregar endpoint `/metrics` para Prometheus ✅ prom-client configurado
-- [x] **1.1.9** Agregar health check mejorado (verificar DB, Redis, Kafka) ✅ Health check implementado
-- [x] **1.1.10** Manejo graceful de errores de conexión (reconnect logic) ✅ Graceful shutdown implementado
+- [x] **1.1.8** Endpoint `/metrics` para Prometheus ✅ prom-client configurado
+- [x] **1.1.9** Health check mejorado (verificar DB, Redis, Kafka) ✅ Health check implementado
+- [x] **1.1.10** Graceful de errores de conexión (reconnect logic) ✅ Graceful shutdown implementado
 
 #### 1.2 auth-service — Completar (45% → 100%)
 
 - [x] **1.2.1** Instalar dependencias: `cd services/auth-service && npm install` ✅
 - [x] **1.2.2** Crear `env.example` con todas las variables necesarias ✅
-- [x] **1.2.3** Crear migración de BD: tabla `users` (id, email, password_hash, role, created_at, updated_at) ✅ 001_create_users.js
-- [x] **1.2.4** Implementar `register` mutation: ✅
+- [x] **1.2.3** Migración de BD: tabla `users` (id, email, password_hash, role, created_at, updated_at) ✅ 001_create_users.js
+- [x] **1.2.4** `register` mutation: ✅
   - [x] Validar email único ✅
   - [x] Hash password con bcrypt (salt rounds 12) ✅
   - [x] Insertar en PostgreSQL ✅
   - [x] Retornar user + token ✅
-- [x] **1.2.5** Implementar `login` mutation: ✅
+- [x] **1.2.5** `login` mutation: ✅
   - [x] Buscar user por email ✅
   - [x] Verificar password con bcrypt ✅
   - [x] Generar JWT token (con expiración) ✅
   - [x] Retornar AuthPayload ✅
-- [x] **1.2.6** Implementar `me` query: ✅
+- [x] **1.2.6** `me` query: ✅
   - [x] Validar JWT del header ✅
   - [x] Buscar user en DB ✅
   - [x] Retornar datos del usuario ✅
-- [x] **1.2.7** Crear middleware de validación JWT (reutilizable para otros servicios) ✅
-- [x] **1.2.8** Implementar refresh token flow ✅ refreshToken mutation implementada
-- [ ] **1.2.9** Agregar Redis para session management / token blacklist
-- [ ] **1.2.10** Agregar rate limiting en el endpoint de login
-- [x] **1.2.11** Agregar tests unitarios (registro, login, validación) ✅ 37 tests, 100% coverage
-- [x] **1.2.12** Agregar Dockerfile multi-stage (siguiendo patrón de order-service) ✅
+- [x] **1.2.7** Middleware validación JWT (reutilizable para otros servicios) ✅
+- [x] **1.2.8** Refresh token flow ✅ refreshToken mutation implementada
+- [x] **1.2.9** Redis para session management / token blacklist ✅ logout mutation + blacklist con TTL
+- [x] **1.2.10** Rate limiting en endpoint de login ✅ 5 intentos/15min por IP+email
+- [x] **1.2.11** Tests unitarios (registro, login, validación) ✅ 37 tests, 100% coverage
+- [x] **1.2.12** Dockerfile multi-stage (patrón de order-service) ✅
 
 #### 1.3 restaurant-service — Crear desde cero (55% → 100%)
 
-- [x] **1.3.1** Crear estructura del servicio (copiar esqueleto de order-service): ✅
+- [x] **1.3.1** Estructura del servicio (copiar esqueleto de order-service): ✅
   - [x] `package.json` con dependencias ✅
   - [x] `tsconfig.json` ✅
   - [x] `Dockerfile` multi-stage ✅
@@ -210,47 +210,47 @@ service-name/
   - [ ] `src/repositories/` (integrado en service)
   - [ ] `src/models/` (tipos inline en service)
   - [x] `src/utils/logger.ts` ✅
-- [x] **1.3.2** Definir GraphQL schema: ✅
+- [x] **1.3.2** GraphQL schema: ✅
   - [x] Type `Restaurant` (id, name, description, address, rating, isOpen, cuisineType, ownerId) ✅
   - [x] Type `MenuItem` (id, restaurantId, name, description, price, isAvailable, category) ✅
   - [x] Query: `restaurants`, `restaurant(id)`, `menu(restaurantId)`, `menuItem(id)` ✅
   - [x] Mutation: `createRestaurant`, `updateRestaurant`, `deleteRestaurant`, `createMenuItem`, `updateMenuItem`, `deleteMenuItem` ✅
   - [x] Subscription: `restaurantStatusChanged` ✅ (stub)
-- [x] **1.3.3** Implementar conexión a PostgreSQL (base: `restaurant_db`) ✅
-- [x] **1.3.4** Crear migraciones: tablas `restaurants` y `menu_items` ✅ 001 + 002
-- [x] **1.3.5** Implementar resolvers y service layer ✅
-- [x] **1.3.6** Integrar Redis cache para menús populares y restaurantes abiertos ✅ cache-aside pattern completo
-- [ ] **1.3.7** Integrar Kafka producer para eventos: `restaurant.created`, `menu.updated`
-- [ ] **1.3.8** Implementar validación de owner (solo el dueño puede modificar su restaurante)
+- [x] **1.3.3** Conexión a PostgreSQL (base: `restaurant_db`) ✅
+- [x] **1.3.4** Migraciones: tablas `restaurants` y `menu_items` ✅ 001 + 002
+- [x] **1.3.5** Resolvers y service layer ✅
+- [x] **1.3.6** Redis cache para menús populares y restaurantes abiertos ✅ cache-aside pattern completo
+- [x] **1.3.7** Kafka producer para eventos: `restaurant.created`, `menu.updated` ✅ graceful fallback si Kafka no disponible
+- [ ] **1.3.8** Validación de owner (solo dueño puede modificar su restaurante)
 - [ ] **1.3.9** Endpoint `/health` + `/metrics` (health check existe, falta /metrics)
 - [x] **1.3.10** Tests unitarios e integración ✅ 61 tests, ~90% coverage
-- [ ] **1.3.11** Helm chart para deployment
+- [ ] **1.3.11** Helm chart
 
 #### 1.4 api-gateway — Crear desde cero (40% → 100%)
 
-- [x] **1.4.1** Crear estructura del proyecto: ✅
+- [x] **1.4.1** Estructura del proyecto: ✅
   - [x] `package.json` (dependencias: `@apollo/gateway`, `@apollo/server`, etc.) ✅
   - [x] `tsconfig.json` ✅
   - [x] `Dockerfile` ✅
   - [x] `Makefile` ✅
   - [x] `env.example` ✅
   - [x] `src/index.ts` ✅
-- [x] **1.4.2** Implementar Apollo Federation v2: ✅ 3 subgraphs configurados
-  - [x] Configurar gateway con service discovery ✅ IntrospectAndCompose
-  - [x] Subgraphs: auth ✅, restaurant ✅, order ✅
+- [x] **1.4.2** Apollo Federation v2: ✅ 3 subgraphs funcionando
+  - [x] Gateway con service discovery ✅ IntrospectAndCompose
+  - [x] Subgraphs: auth ✅, restaurant ✅, order ✅ (corregido: `buildSubgraphSchema` + `@key`)
   - [x] Manejo de errores de subgraphs caído ✅ RemoteGraphQLDataSource con contexto
-- [x] **1.4.3** Implementar autenticación JWT: ✅
+- [x] **1.4.3** Autenticación JWT: ✅
   - [x] Middleware que valida token en cada request ✅
-  - [x] Pasar user context a todos los subgraphs ✅ (x-user-id, x-user-email, x-user-role)
-  - [x] Manejo de tokens expirados ✅
-- [x] **1.4.4** Implementar rate limiting: ✅
+  - [x] User context a todos los subgraphs ✅ (x-user-id, x-user-email, x-user-role)
+  - [x] Tokens expirados ✅
+- [x] **1.4.4** Rate limiting: ✅
   - [x] Por usuario (usando Redis) ✅ keyGenerator por userId o IP
   - [x] Por IP para requests no autenticados ✅
   - [x] Headers de rate limit en responses ✅ standardHeaders: true
-- [ ] **1.4.5** Implementar GraphQL Subscriptions en el gateway:
+- [ ] **1.4.5** GraphQL Subscriptions en gateway:
   - [ ] WebSocket server
   - [ ] Forward subscriptions a los servicios correctos
-- [x] **1.4.6** Configurar CORS apropiadamente ✅
+- [x] **1.4.6** CORS ✅
 - [x] **1.4.7** Logging estructurado (Winston) ✅
 - [x] **1.4.8** Health check y métricas ✅ Health check con 3 subgraphs + Redis
 - [x] **1.4.9** Tests ✅ 22 tests, 100% coverage en auth middleware
@@ -258,11 +258,11 @@ service-name/
 
 #### 1.5 docker-compose — Hacer funcional (90% → 100%)
 
-- [x] **1.5.1** Actualizar docker-compose para que todos los servicios builden ✅ 4 servicios configurados y funcionales
-- [ ] **1.5.2** Agregar delivery-service al compose (placeholder por ahora)
-- [ ] **1.5.3** Agregar notification-service al compose (placeholder por ahora)
-- [ ] **1.5.4** Crear seed script para datos de prueba
-- [ ] **1.5.5** Verificar que `docker-compose up` levanta todo sin errores
+- [x] **1.5.1** docker-compose para todos los servicios ✅ 4 servicios configurados y funcionales
+- [ ] **1.5.2** Agregar delivery-service al compose (placeholder)
+- [ ] **1.5.3** Agregar notification-service al compose (placeholder)
+- [ ] **1.5.4** Seed script para datos de prueba
+- [x] **1.5.5** `docker-compose up` levanta sin errores ✅ 4 servicios + infraestructura arrancan correctamente
 
 ---
 
@@ -270,20 +270,20 @@ service-name/
 
 #### 2.1 delivery-service — Crear desde cero (0% → 100%)
 
-- [ ] **2.1.1** Crear estructura del proyecto
-- [ ] **2.1.2** Definir schema GraphQL:
+- [ ] **2.1.1** Estructura del proyecto
+- [ ] **2.1.2** Schema GraphQL:
   - [ ] Type `DeliveryPerson` (id, name, status, currentLocation, rating, vehicleType)
   - [ ] Type `Delivery` (id, orderId, deliveryPersonId, status, pickupTime, deliveryTime, location)
   - [ ] Query: `availableDrivers`, `deliveries`, `delivery(id)`
   - [ ] Mutation: `updateDriverStatus`, `assignDelivery`, `updateDeliveryStatus`
   - [ ] Subscription: `deliveryStatusChanged`, `driverAssigned`
-- [ ] **2.1.3** Implementar **Kafka consumer** para evento `order.created`:
+- [ ] **2.1.3** **Kafka consumer** para evento `order.created`:
   - [ ] Consumir evento
   - [ ] Buscar repartidor disponible más cercano
   - [ ] Asignar delivery
   - [ ] Publicar evento `delivery.assigned`
-- [ ] **2.1.4** Implementar Kafka consumer para `order.cancelled` → liberar delivery
-- [ ] **2.1.5** Conexión a PostgreSQL (`delivery_db`)
+- [ ] **2.1.4** Kafka consumer para `order.cancelled` → liberar delivery
+- [ ] **2.1.5** PostgreSQL (`delivery_db`)
 - [ ] **2.1.6** Migraciones: tablas `delivery_people` y `deliveries`
 - [ ] **2.1.7** Redis para geolocalización en tiempo real (GeoHash)
 - [ ] **2.1.8** Simulación de mapa/mock de geolocalización
@@ -293,22 +293,22 @@ service-name/
 
 #### 2.2 notification-service — Crear desde cero (0% → 100%)
 
-- [ ] **2.2.1** Crear estructura del proyecto
-- [ ] **2.2.2** Definir schema GraphQL (para gestionar preferencias de notificación):
+- [ ] **2.2.1** Estructura del proyecto
+- [ ] **2.2.2** Schema GraphQL (gestionar preferencias de notificación):
   - [ ] Type `NotificationPreference` (userId, email, sms, push)
   - [ ] Type `Notification` (id, userId, type, message, read, createdAt)
   - [ ] Query: `notifications(userId)`, `notificationPreferences(userId)`
   - [ ] Mutation: `updateNotificationPreferences`, `markNotificationRead`
   - [ ] Subscription: `newNotification`
-- [ ] **2.2.3** Implementar Kafka consumers:
+- [ ] **2.2.3** Kafka consumers:
   - [ ] `order.created` → notificar al restaurante
   - [ ] `order.assigned` → notificar al cliente
   - [ ] `order.delivered` → notificar al cliente
   - [ ] `delivery.assigned` → notificar al repartidor
   - [ ] `order.cancelled` → notificar a todas las partes
-- [ ] **2.2.4** Integrar proveedor de email (SendGrid, AWS SES, o mock)
-- [ ] **2.2.5** Integrar proveedor de SMS (Twilio, o mock)
-- [ ] **2.2.6** Implementar notificaciones push en tiempo real:
+- [ ] **2.2.4** Proveedor de email (SendGrid, AWS SES, o mock)
+- [ ] **2.2.5** Proveedor de SMS (Twilio, o mock)
+- [ ] **2.2.6** Notificaciones push en tiempo real:
   - [ ] WebSocket server o Server-Sent Events (SSE)
   - [ ] GraphQL subscriptions para `newNotification`
 - [ ] **2.2.7** PostgreSQL para historial de notificaciones
@@ -318,15 +318,15 @@ service-name/
 
 #### 2.3 Kafka — Setup completo
 
-- [ ] **2.3.1** Crear tópicos explícitamente (no depender de auto-create):
+- [ ] **2.3.1** Tópicos explícitos (no auto-create):
   - [ ] `order.created`, `order.assigned`, `order.delivered`, `order.cancelled`
   - [ ] `delivery.assigned`, `delivery.status_changed`
   - [ ] `restaurant.created`, `menu.updated`
   - [ ] `notification.email`, `notification.sms`
-- [ ] **2.3.2** Crear script de inicialización de tópicos
-- [ ] **2.3.3** Configurar consumer groups con nombres descriptivos
-- [ ] **2.3.4** Implementar dead letter queue para eventos fallidos
-- [ ] **2.3.5** Implementar retry logic con backoff exponencial
+- [ ] **2.3.2** Script de inicialización de tópicos
+- [ ] **2.3.3** Consumer groups con nombres descriptivos
+- [ ] **2.3.4** Dead letter queue para eventos fallidos
+- [ ] **2.3.5** Retry logic con backoff exponencial
 
 ---
 
@@ -345,7 +345,7 @@ service-name/
 ### FASE 4 — Observabilidad (85% → 90%)
 
 - [ ] **4.1** Métricas (Prometheus) — `prom-client` en cada servicio, dashboards Grafana
-- [ ] **4.2** Logging — Formato JSON estructurado, correlation ID, Loki + Grafana
+- [ ] **4.2** Logging — JSON estructurado, correlation ID, Loki + Grafana
 - [ ] **4.3** Distributed Tracing — OpenTelemetry, Jaeger/Tempo, trace context en HTTP y Kafka
 - [ ] **4.4** Alerting — Alertmanager, alertas de servicio caído, latencia, error rate, recursos
 
@@ -431,33 +431,33 @@ curl -X POST http://localhost:3000/graphql \
 
 ### **OPCIÓN E: MVP Rápido (RECOMENDADO)** ⭐
 
-**Objetivo:** Ver un flujo completo funcionando en ~3 horas.
+**Objetivo:** Flujo completo funcionando en ~3 horas.
 
 **Secuencia:**
 
 1. **Completar Auth Service básico** (1 hora)
    - Instalar dependencias
-   - Crear migración de tabla `users`
-   - Implementar registro con bcrypt
-   - Implementar login con JWT
-   - Implementar query `me`
+   - Migración tabla `users`
+   - Registro con bcrypt
+   - Login con JWT
+   - Query `me`
 
 2. **Crear Restaurant Service mínimo** (1 hora)
    - Copiar estructura de order-service
-   - Implementar CRUD básico de restaurantes
-   - Implementar gestión de menús
-   - Integrar cache Redis
+   - CRUD básico de restaurantes
+   - Gestión de menús
+   - Cache Redis
 
 3. **API Gateway básico** (1 hora)
-   - Crear estructura del gateway
-   - Implementar Apollo Federation v2
+   - Estructura del gateway
+   - Apollo Federation v2
    - Conectar auth-service, restaurant-service, order-service
-   - Implementar autenticación JWT básica
+   - Autenticación JWT básica
 
 4. **Probar flujo completo** (15 min)
    - Registro → Login → Crear restaurante → Crear pedido
 
-**Total:** ~3 horas para un MVP funcional
+**Total:** ~3 horas para MVP funcional
 
 ---
 
@@ -471,13 +471,13 @@ curl -X POST http://localhost:3000/graphql \
 | **D) API Gateway** | Unificar servicios | 4-5 horas | Alta |
 | **E) MVP Rápido** ⭐ | Auth + Restaurant + Gateway básico | ~3 horas | Media |
 
-**Recomendación:** Opción E para ver resultados rápido y mantener motivación.
+**Recomendación:** Opción E para ver resultados rápido.
 
 ---
 
 ## 🎓 Comandos Make Estándar
 
-Cada servicio debe implementar:
+Cada servicio implementa:
 
 - `make install` — Instalar dependencias
 - `make build` — Compilar
@@ -506,9 +506,9 @@ Cada servicio debe implementar:
 ## 💡 Notas Importantes
 
 1. **Seguridad**: Cambiar todos los secrets por defecto antes de producción
-2. **Costos AWS**: Los recursos creados tienen costos. Revisar pricing
+2. **Costos AWS**: Recursos creados tienen costos. Revisar pricing
 3. **Escalabilidad**: Ajustar HPA y recursos según necesidades
-4. **Monitoreo**: Implementar dashboards de Grafana y alertas
+4. **Monitoreo**: Dashboards Grafana y alertas
 5. **Disciplina**: Un checkbox a la vez se construyen los proyectos que importan
 
 ---
@@ -517,7 +517,7 @@ Cada servicio debe implementar:
 
 | Fase | Tareas | Completadas | Pendientes | Progreso |
 |------|--------|-------------|------------|----------|
-| 1. Servicios Core | 69 | 45 | 24 | ~65% |
+| 1. Servicios Core | 69 | 47 | 22 | ~68% |
 | 2. Eventos y Notificaciones | 35 | 0 | 35 | 0% |
 | 3. Testing | 33 | 3 | 30 | ~9% |
 | 4. Observabilidad | 20 | 0 | 20 | 0% |
@@ -526,12 +526,12 @@ Cada servicio debe implementar:
 | 7. Documentación | 14 | 6 | 8 | ~43% |
 | 8. Frontend | 26 | 0 | 26 | 0% |
 | 9. Producción | 13 | 0 | 13 | 0% |
-| **TOTAL** | **242** | **59** | **183** | **~41%** |
+| **TOTAL** | **242** | **61** | **181** | **~42%** |
 
 ---
 
-> **Nota:** Este es un documento vivo. Se actualiza conforme avanza el proyecto.
-> Estimación total: **4-6 semanas** de desarrollo activo.
+> **Nota:** Documento vivo. Actualizar conforme avanza proyecto.
+> Estimación total: **4-6 semanas** desarrollo activo.
 >
 > *"Los proyectos grandes no se hacen por inspiración. Se hacen por disciplina, un commit a la vez."*
 >

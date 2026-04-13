@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import { createClient, RedisClientType } from 'redis';
 import { logger } from '../utils/logger';
+import { RestaurantKafkaProducer } from '../events/kafka.producer';
 
 export interface CreateRestaurantInput {
   name: string;
@@ -74,7 +75,8 @@ export class RestaurantService {
   constructor(
     private pool: Pool,
     redisUrl: string,
-    cacheTTL?: number
+    cacheTTL?: number,
+    private kafkaProducer?: RestaurantKafkaProducer
   ) {
     this.redis = createClient({ url: redisUrl });
     this.redis.on('error', (err) => logger.error('Redis error', err));
@@ -171,6 +173,14 @@ export class RestaurantService {
     await this.invalidateRestaurantsCache();
 
     logger.info('Restaurant created', { id: restaurant.id, name: restaurant.name });
+
+    await this.kafkaProducer?.publishRestaurantCreated({
+      restaurantId: restaurant.id,
+      name: restaurant.name,
+      ownerId: restaurant.ownerId,
+      cuisineType: restaurant.cuisineType,
+      timestamp: new Date().toISOString(),
+    });
 
     return restaurant;
   }
@@ -306,6 +316,13 @@ export class RestaurantService {
 
     logger.info('Menu item created', { id: menuItem.id, name: menuItem.name });
 
+    await this.kafkaProducer?.publishMenuUpdated({
+      restaurantId: input.restaurantId,
+      action: 'created',
+      menuItemId: menuItem.id,
+      timestamp: new Date().toISOString(),
+    });
+
     return menuItem;
   }
 
@@ -356,6 +373,13 @@ export class RestaurantService {
 
     logger.info('Menu item updated', { id: menuItem.id });
 
+    await this.kafkaProducer?.publishMenuUpdated({
+      restaurantId: menuItem.restaurantId,
+      action: 'updated',
+      menuItemId: menuItem.id,
+      timestamp: new Date().toISOString(),
+    });
+
     return menuItem;
   }
 
@@ -369,6 +393,13 @@ export class RestaurantService {
     await this.redis.del(`menu:${menuItem.restaurantId}`).catch(() => {});
 
     logger.info('Menu item deleted', { id });
+
+    await this.kafkaProducer?.publishMenuUpdated({
+      restaurantId: menuItem.restaurantId,
+      action: 'deleted',
+      menuItemId: id,
+      timestamp: new Date().toISOString(),
+    });
 
     return true;
   }
