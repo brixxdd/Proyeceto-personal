@@ -24,8 +24,8 @@ export interface User {
   name: string;
   phone?: string;
   role: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AuthPayload {

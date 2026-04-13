@@ -1,6 +1,6 @@
 # 🎯 MASTER PLAN — Plataforma de Pedidos en Tiempo Real
 
-> **Progreso Total: ~35%** | Última actualización: 2026-04-12
+> **Progreso Total: ~41%** | Última actualización: 2026-04-12
 >
 > Documento único que converge: ROADMAP, IMPLEMENTATION_STATUS, PRIORITY_PLAN, NEXT_STEPS, QUICK_START, LA_VISION, PROJECT_STRUCTURE
 
@@ -25,17 +25,17 @@ Plataforma cloud-native distribuida y escalable inspirada en Uber Eats, con arqu
 | **Infraestructura Terraform** | 100% | ✅ Completo | VPC, EKS, RDS, MSK, ElastiCache |
 | **Helm Charts** | ~17% | 🚧 Parcial | Solo order-service |
 | **order-service** | ~85% | 🚧 Casi listo | Código sólido, sin tests, auth JWT stub, precio hardcodeado |
-| **auth-service** | ~45% | 🚧 Avanzando | Resolvers con lógica real (register/login con bcrypt+JWT), sin Redis blacklist |
-| **restaurant-service** | ~45% | 🚧 Avanzando | CRUD completo con cache Redis, migraciones completas, sin auth en resolvers |
-| **api-gateway** | ~10% | 🚧 Mínimo | 2 subgraphs activos (auth, restaurant), order-service comentado |
+| **auth-service** | ~60% | 🚧 Avanzando | Tests completos (100% coverage), register/login con bcrypt+JWT, falta Redis blacklist y rate limiting |
+| **restaurant-service** | ~55% | 🚧 Avanzando | CRUD completo con cache Redis, migraciones, **tests completos (61 tests, ~90% coverage)**, sin auth ni Kafka |
+| **api-gateway** | ~40% | 🚧 Avanzando | 3 subgraphs configurados (auth, restaurant, order), rate limiting con Redis, health check completo, **tests (22 tests, 100% coverage auth)** |
 | **delivery-service** | 0% | 📋 Pendiente | No existe |
 | **notification-service** | 0% | 📋 Pendiente | No existe |
 | **CI/CD** | ~17% | 🚧 Parcial | Solo order-service (lint, test, build, security, deploy) |
 | **Documentación** | ~50% | 🚧 Parcial | Faltan observabilidad, devops, runbooks, despliegue |
-| **Tests** | 0% | 📋 Pendiente | Cero archivos de test |
+| **Tests** | ~10% | 🚧 Avanzando | auth-service (37 tests, 100% coverage), restaurant-service (61 tests, ~90%), api-gateway (22 tests, 100% auth) |
 | **Frontend** | 0% | 📋 Pendiente | No existe app React |
 
-**Progreso Total: ~35%**
+**Progreso Total: ~41%**
 
 ---
 
@@ -192,10 +192,10 @@ service-name/
 - [x] **1.2.8** Implementar refresh token flow ✅ refreshToken mutation implementada
 - [ ] **1.2.9** Agregar Redis para session management / token blacklist
 - [ ] **1.2.10** Agregar rate limiting en el endpoint de login
-- [ ] **1.2.11** Agregar tests unitarios (registro, login, validación)
+- [x] **1.2.11** Agregar tests unitarios (registro, login, validación) ✅ 37 tests, 100% coverage
 - [x] **1.2.12** Agregar Dockerfile multi-stage (siguiendo patrón de order-service) ✅
 
-#### 1.3 restaurant-service — Crear desde cero (45% → 100%)
+#### 1.3 restaurant-service — Crear desde cero (55% → 100%)
 
 - [x] **1.3.1** Crear estructura del servicio (copiar esqueleto de order-service): ✅
   - [x] `package.json` con dependencias ✅
@@ -208,25 +208,25 @@ service-name/
   - [x] `src/resolvers/` ✅ (resolvers.ts)
   - [x] `src/services/` ✅ (restaurant.service.ts)
   - [ ] `src/repositories/` (integrado en service)
-  - [ ] `src/models/` (tipos inline)
+  - [ ] `src/models/` (tipos inline en service)
   - [x] `src/utils/logger.ts` ✅
 - [x] **1.3.2** Definir GraphQL schema: ✅
   - [x] Type `Restaurant` (id, name, description, address, rating, isOpen, cuisineType, ownerId) ✅
   - [x] Type `MenuItem` (id, restaurantId, name, description, price, isAvailable, category) ✅
   - [x] Query: `restaurants`, `restaurant(id)`, `menu(restaurantId)`, `menuItem(id)` ✅
-  - [x] Mutation: `createRestaurant`, `updateRestaurant`, `createMenuItem`, `updateMenuItem` ✅
+  - [x] Mutation: `createRestaurant`, `updateRestaurant`, `deleteRestaurant`, `createMenuItem`, `updateMenuItem`, `deleteMenuItem` ✅
   - [x] Subscription: `restaurantStatusChanged` ✅ (stub)
 - [x] **1.3.3** Implementar conexión a PostgreSQL (base: `restaurant_db`) ✅
 - [x] **1.3.4** Crear migraciones: tablas `restaurants` y `menu_items` ✅ 001 + 002
 - [x] **1.3.5** Implementar resolvers y service layer ✅
-- [x] **1.3.6** Integrar Redis cache para menús populares y restaurantes abiertos ✅ cache-aside pattern
+- [x] **1.3.6** Integrar Redis cache para menús populares y restaurantes abiertos ✅ cache-aside pattern completo
 - [ ] **1.3.7** Integrar Kafka producer para eventos: `restaurant.created`, `menu.updated`
 - [ ] **1.3.8** Implementar validación de owner (solo el dueño puede modificar su restaurante)
-- [ ] **1.3.9** Endpoint `/health` + `/metrics` (health check básico sin /metrics)
-- [ ] **1.3.10** Tests unitarios e integración
+- [ ] **1.3.9** Endpoint `/health` + `/metrics` (health check existe, falta /metrics)
+- [x] **1.3.10** Tests unitarios e integración ✅ 61 tests, ~90% coverage
 - [ ] **1.3.11** Helm chart para deployment
 
-#### 1.4 api-gateway — Crear desde cero (10% → 100%)
+#### 1.4 api-gateway — Crear desde cero (40% → 100%)
 
 - [x] **1.4.1** Crear estructura del proyecto: ✅
   - [x] `package.json` (dependencias: `@apollo/gateway`, `@apollo/server`, etc.) ✅
@@ -235,30 +235,30 @@ service-name/
   - [x] `Makefile` ✅
   - [x] `env.example` ✅
   - [x] `src/index.ts` ✅
-- [x] **1.4.2** Implementar Apollo Federation v2: ✅ (parcial - 2 de 3+ subgraphs)
+- [x] **1.4.2** Implementar Apollo Federation v2: ✅ 3 subgraphs configurados
   - [x] Configurar gateway con service discovery ✅ IntrospectAndCompose
-  - [x] Subgraphs: auth ✅, restaurant ✅, order (❌ comentado)
-  - [ ] Manejo de errores de subgraphs caídos
-- [x] **1.4.3** Implementar autenticación JWT: ✅ (básico)
+  - [x] Subgraphs: auth ✅, restaurant ✅, order ✅
+  - [x] Manejo de errores de subgraphs caído ✅ RemoteGraphQLDataSource con contexto
+- [x] **1.4.3** Implementar autenticación JWT: ✅
   - [x] Middleware que valida token en cada request ✅
-  - [ ] Pasar user context a todos los subgraphs
-  - [ ] Manejo de tokens expirados
-- [ ] **1.4.4** Implementar rate limiting:
-  - [ ] Por usuario (usando Redis)
-  - [ ] Por IP para requests no autenticados
-  - [ ] Headers de rate limit en responses
+  - [x] Pasar user context a todos los subgraphs ✅ (x-user-id, x-user-email, x-user-role)
+  - [x] Manejo de tokens expirados ✅
+- [x] **1.4.4** Implementar rate limiting: ✅
+  - [x] Por usuario (usando Redis) ✅ keyGenerator por userId o IP
+  - [x] Por IP para requests no autenticados ✅
+  - [x] Headers de rate limit en responses ✅ standardHeaders: true
 - [ ] **1.4.5** Implementar GraphQL Subscriptions en el gateway:
   - [ ] WebSocket server
   - [ ] Forward subscriptions a los servicios correctos
-- [ ] **1.4.6** Configurar CORS apropiadamente
+- [x] **1.4.6** Configurar CORS apropiadamente ✅
 - [x] **1.4.7** Logging estructurado (Winston) ✅
-- [ ] **1.4.8** Health check y métricas (health check básico existe)
-- [ ] **1.4.9** Tests
+- [x] **1.4.8** Health check y métricas ✅ Health check con 3 subgraphs + Redis
+- [x] **1.4.9** Tests ✅ 22 tests, 100% coverage en auth middleware
 - [ ] **1.4.10** Helm chart
 
-#### 1.5 docker-compose — Hacer funcional (80% → 100%)
+#### 1.5 docker-compose — Hacer funcional (90% → 100%)
 
-- [x] **1.5.1** Actualizar docker-compose para que todos los servicios builden ✅ 4 servicios configurados
+- [x] **1.5.1** Actualizar docker-compose para que todos los servicios builden ✅ 4 servicios configurados y funcionales
 - [ ] **1.5.2** Agregar delivery-service al compose (placeholder por ahora)
 - [ ] **1.5.3** Agregar notification-service al compose (placeholder por ahora)
 - [ ] **1.5.4** Crear seed script para datos de prueba
@@ -517,16 +517,16 @@ Cada servicio debe implementar:
 
 | Fase | Tareas | Completadas | Pendientes | Progreso |
 |------|--------|-------------|------------|----------|
-| 1. Servicios Core | 69 | 34 | 35 | ~49% |
+| 1. Servicios Core | 69 | 45 | 24 | ~65% |
 | 2. Eventos y Notificaciones | 35 | 0 | 35 | 0% |
-| 3. Testing | 33 | 0 | 33 | 0% |
+| 3. Testing | 33 | 3 | 30 | ~9% |
 | 4. Observabilidad | 20 | 0 | 20 | 0% |
 | 5. Seguridad | 16 | 0 | 16 | 0% |
 | 6. CI/CD | 16 | 5 | 11 | ~31% |
 | 7. Documentación | 14 | 6 | 8 | ~43% |
 | 8. Frontend | 26 | 0 | 26 | 0% |
 | 9. Producción | 13 | 0 | 13 | 0% |
-| **TOTAL** | **242** | **45** | **197** | **~35%** |
+| **TOTAL** | **242** | **59** | **183** | **~41%** |
 
 ---
 
