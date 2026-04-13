@@ -137,3 +137,93 @@ Cuando termines:
 > *"Los proyectos grandes no se hacen por inspiración. Se hacen por disciplina, un commit a la vez."*
 
 🔥 **Nos vemos mañana. Fase 1, tarea 1.1.1. Vamos a construir esta cosa.**
+
+---
+
+## 💰 Si decides venderlo — Pricing para Tapachula, Chiapas
+
+> *Mercado real: ~350k hab, restaurantes familiares/pequeños, Chiapas = estado de bajos ingresos. Uber Eats cobra 30-35% de comisión — tú puedes aplastarlo.*
+
+---
+
+### Tus costos de infraestructura (lo que TÚ pagas)
+
+| Concepto | Costo mensual |
+|----------|--------------|
+| Servidor escuela (k3s) | $0 MXN |
+| VPS backup/producción (si lo usas) | $400–800 MXN |
+| Dominio (.com.mx) | ~$17 MXN/mes (~$200/año) |
+| SSL | $0 (Let's Encrypt) |
+| SMS notificaciones (Twilio, ~500 SMS) | $100–200 MXN |
+| Email (SendGrid free tier <100/día) | $0 |
+| **Total infraestructura** | **~$500–1,000 MXN/mes** |
+
+---
+
+### Modelo recomendado: Híbrido
+
+**Setup (cobro único por onboarding):**
+- Instalación + configuración + capacitación: **$2,000–4,000 MXN** por restaurante
+
+**Suscripción mensual (por restaurante):**
+
+| Plan | Qué incluye | Precio MXN/mes |
+|------|-------------|----------------|
+| **Básico** | Menú online, pedidos, 1 sucursal, soporte email | **$800–1,200** |
+| **Pro** | + analytics, notificaciones SMS, prioridad soporte | **$1,800–2,500** |
+| **Premium** | + múltiples sucursales, branding propio, integraciones | **$3,500–5,000** |
+
+**Comisión por pedido (opcional, en lugar de o adicional a suscripción):**
+- Uber Eats cobra **30–35%** → tú cobras **8–15%** = ventaja brutal
+- Con ticket promedio $150 MXN y 50 pedidos/día → cobras ~$900–1,125 MXN/día por restaurante
+
+---
+
+### Proyección realista
+
+Con **5 restaurantes en Plan Pro** + comisión del 10%:
+
+| Fuente | Ingreso estimado |
+|--------|-----------------|
+| Suscripciones (5 × $2,000) | $10,000 MXN/mes |
+| Comisiones (5 rest × 30 pedidos × $150 × 10%) | $6,750 MXN/mes |
+| **Total bruto** | **~$16,750 MXN/mes** |
+| Menos infraestructura | -$1,000 MXN |
+| **Ganancia neta** | **~$15,750 MXN/mes** |
+
+---
+
+### Lo que cobrar por servicios adicionales
+
+| Servicio | Precio |
+|----------|--------|
+| Integración con sistema de caja existente | $3,000–6,000 MXN |
+| App móvil personalizada (si la construyes) | $15,000–30,000 MXN |
+| Soporte técnico presencial (por visita) | $500–800 MXN/hora |
+| Capacitación extra staff | $1,500 MXN/sesión |
+| Migración de datos desde otro sistema | $2,000–4,000 MXN |
+
+---
+
+### Ventaja competitiva vs Uber Eats en Tapachula
+
+| Factor | Uber Eats | Tú |
+|--------|-----------|-----|
+| Comisión | 30–35% | 8–15% |
+| Soporte | Call center impersonal | Presencial local |
+| Customización | Ninguna | Total |
+| Datos del negocio | Los tiene Uber | Los tiene el restaurante |
+| Cobertura Tapachula | Limitada/irregular | 100% local |
+
+---
+
+### Lo que necesitas para venderlo legalmente
+
+- **RFC** como persona física con actividad empresarial (o constituir SC/SAS)
+- **Contrato de servicio** con cada cliente (protege ambas partes)
+- **Facturación** con CFDI 4.0 (usa Facturapi o similar, ~$200 MXN/mes)
+- **Seguro de datos** si manejas info de clientes finales (LFPDPPP)
+
+---
+
+> *Con 10 restaurantes en plan Pro + comisiones = ~$30,000+ MXN/mes. Solo en Tapachula. Escala a Tuxtla, San Cristóbal, Comitán = negocio real.*
