@@ -1,6 +1,6 @@
 # 🎯 MASTER PLAN — Plataforma de Pedidos en Tiempo Real
 
-> **Progreso Total: ~42%** | Última actualización: 2026-04-13
+> **Progreso Total: ~45%** | Última actualización: 2026-04-13
 >
 > Converge: ROADMAP, IMPLEMENTATION_STATUS, PRIORITY_PLAN, NEXT_STEPS, QUICK_START, LA_VISION, PROJECT_STRUCTURE
 
@@ -25,8 +25,8 @@ Plataforma cloud-native distribuida, escalable. Inspirada en Uber Eats. Microser
 | **Infraestructura Terraform** | 100% | ✅ Completo | VPC, EKS, RDS, MSK, ElastiCache |
 | **Helm Charts** | ~17% | 🚧 Parcial | Solo order-service |
 | **order-service** | ~87% | 🚧 Casi listo | Apollo Federation v2 integrado (`buildSubgraphSchema`, `@apollo/subgraph`), sin tests, auth JWT stub, precio hardcodeado |
-| **auth-service** | ~60% | 🚧 Avanzando | Tests completos (100% coverage), register/login con bcrypt+JWT, falta Redis blacklist y rate limiting |
-| **restaurant-service** | ~55% | 🚧 Avanzando | CRUD completo con cache Redis, migraciones, **tests completos (61 tests, ~90% coverage)**, sin auth ni Kafka |
+| **auth-service** | ~100% | ✅ Completo | register/login/logout/refreshToken, bcrypt+JWT, Redis blacklist, rate limiting (5/15min), 37 tests 100% coverage |
+| **restaurant-service** | ~75% | 🚧 Avanzando | CRUD+cache Redis, Kafka producer (restaurant.created, menu.updated), 61 tests ~90% coverage, falta owner auth + /metrics + Helm |
 | **api-gateway** | ~50% | 🚧 Avanzando | Federation funcionando con los 3 subgraphs ✅, rate limiting con Redis, health check completo, **tests (22 tests, 100% coverage auth)** |
 | **delivery-service** | 0% | 📋 Pendiente | No existe |
 | **notification-service** | 0% | 📋 Pendiente | No existe |
@@ -35,7 +35,7 @@ Plataforma cloud-native distribuida, escalable. Inspirada en Uber Eats. Microser
 | **Tests** | ~10% | 🚧 Avanzando | auth-service (37 tests, 100% coverage), restaurant-service (61 tests, ~90%), api-gateway (22 tests, 100% auth) |
 | **Frontend** | 0% | 📋 Pendiente | No existe app React |
 
-**Progreso Total: ~41%**
+**Progreso Total: ~45%**
 
 ---
 
