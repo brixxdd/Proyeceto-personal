@@ -224,7 +224,7 @@ service-name/
 - [x] **1.3.8** Validación de owner (solo dueño puede modificar su restaurante) ✅ RBAC en todos los mutations, ADMIN bypass
 - [x] **1.3.9** Endpoint `/health` + `/metrics` ✅ prom-client, métricas de negocio + conexiones
 - [x] **1.3.10** Tests unitarios e integración ✅ 61 tests, ~90% coverage
-- [ ] **1.3.11** Helm chart
+- [x] **1.3.11** Helm chart ✅ Deployment, Service, HPA, Secret, ConfigMap, ServiceMonitor
 
 #### 1.4 api-gateway — Crear desde cero (40% → 100%)
 
