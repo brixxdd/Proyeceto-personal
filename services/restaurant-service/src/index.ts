@@ -13,6 +13,7 @@ import { typeDefs } from './schema';
 import { resolvers, initializeResolvers } from './resolvers';
 import { RestaurantService } from './services/restaurant.service';
 import { RestaurantKafkaProducer } from './events/kafka.producer';
+import { register, connectionStatus } from './metrics/prometheus';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -32,6 +33,16 @@ const restaurantService = new RestaurantService(
   parseInt(process.env.CACHE_TTL || '300'),
   kafkaProducer
 );
+
+// Metrics endpoint
+app.get('/metrics', async (_req, res) => {
+  try {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  } catch (error) {
+    res.status(500).end(error);
+  }
+});
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -68,6 +79,9 @@ async function startServer() {
   await restaurantService.initialize();
   await kafkaProducer.connect();
   initializeResolvers(restaurantService);
+
+  // Set initial connection gauges
+  connectionStatus.set({ service: 'kafka' }, kafkaProducer.isConnected() ? 1 : 0);
 
   const httpServer = http.createServer(app);
 

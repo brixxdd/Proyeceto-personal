@@ -222,7 +222,7 @@ service-name/
 - [x] **1.3.6** Redis cache para menús populares y restaurantes abiertos ✅ cache-aside pattern completo
 - [x] **1.3.7** Kafka producer para eventos: `restaurant.created`, `menu.updated` ✅ graceful fallback si Kafka no disponible
 - [x] **1.3.8** Validación de owner (solo dueño puede modificar su restaurante) ✅ RBAC en todos los mutations, ADMIN bypass
-- [ ] **1.3.9** Endpoint `/health` + `/metrics` (health check existe, falta /metrics)
+- [x] **1.3.9** Endpoint `/health` + `/metrics` ✅ prom-client, métricas de negocio + conexiones
 - [x] **1.3.10** Tests unitarios e integración ✅ 61 tests, ~90% coverage
 - [ ] **1.3.11** Helm chart
 
