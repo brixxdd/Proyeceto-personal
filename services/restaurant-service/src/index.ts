@@ -1,0 +1,90 @@
+import 'dotenv/config';
+import express from 'express';
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware } from '@apollo/server/express4';
+import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
+import { buildSubgraphSchema } from '@apollo/subgraph';
+import cors from 'cors';
+import http from 'http';
+import { Pool } from 'pg';
+import { logger } from './utils/logger';
+import { typeDefs } from './schema';
+import { resolvers, initializeResolvers } from './resolvers';
+import { RestaurantService } from './services/restaurant.service';
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Database connection
+const dbPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// Initialize service
+const restaurantService = new RestaurantService(
+  dbPool,
+  process.env.REDIS_URL || 'redis://localhost:6379',
+  parseInt(process.env.CACHE_TTL || '300')
+);
+
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  const checks: Record<string, string> = {};
+
+  // Check DB
+  try {
+    await dbPool.query('SELECT 1');
+    checks.database = 'healthy';
+  } catch (error) {
+    checks.database = 'unhealthy';
+  }
+
+  // Check Redis (ping)
+  try {
+    await restaurantService['redis'].ping();
+    checks.redis = 'healthy';
+  } catch (error) {
+    checks.redis = 'unhealthy';
+  }
+
+  const isHealthy = checks.database === 'healthy';
+
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'healthy' : 'unhealthy',
+    service: 'restaurant-service',
+    timestamp: new Date().toISOString(),
+    checks,
+  });
+});
+
+// Apollo Server
+async function startServer() {
+  await restaurantService.initialize();
+  initializeResolvers(restaurantService);
+
+  const httpServer = http.createServer(app);
+
+  const server = new ApolloServer({
+    schema: buildSubgraphSchema([{ typeDefs, resolvers }]),
+    plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+    introspection: process.env.NODE_ENV !== 'production',
+  });
+
+  await server.start();
+
+  app.use(
+    '/graphql',
+    cors(),
+    express.json(),
+    expressMiddleware(server)
+  );
+
+  await httpServer.listen({ port: PORT });
+  logger.info(`Restaurant Service running on port ${PORT}`);
+  logger.info(`GraphQL endpoint: http://localhost:${PORT}/graphql`);
+}
+
+startServer().catch((error) => {
+  logger.error('Failed to start server', error);
+  process.exit(1);
+});

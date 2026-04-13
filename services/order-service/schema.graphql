@@ -1,0 +1,90 @@
+type Query {
+  orders(status: OrderStatus, limit: Int, offset: Int): [Order!]!
+  order(id: ID!): Order
+}
+
+type Mutation {
+  createOrder(input: CreateOrderInput!): Order!
+  updateOrderStatus(id: ID!, status: OrderStatus!): Order!
+  cancelOrder(id: ID!): Order!
+}
+
+type Subscription {
+  orderStatusChanged(orderId: ID!): Order!
+}
+
+type Order {
+  id: ID!
+  customerId: ID!
+  restaurantId: ID!
+  items: [OrderItem!]!
+  status: OrderStatus!
+  totalAmount: Float!
+  deliveryAddress: Address!
+  deliveryPersonId: ID
+  estimatedDeliveryTime: Int
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type OrderItem {
+  id: ID!
+  menuItemId: ID!
+  quantity: Int!
+  price: Float!
+  subtotal: Float!
+}
+
+type Address {
+  street: String!
+  city: String!
+  state: String!
+  zipCode: String!
+  country: String!
+  coordinates: Coordinates
+}
+
+type Coordinates {
+  latitude: Float!
+  longitude: Float!
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+input CreateOrderInput {
+  restaurantId: ID!
+  items: [OrderItemInput!]!
+  deliveryAddress: AddressInput!
+}
+
+input OrderItemInput {
+  menuItemId: ID!
+  quantity: Int!
+}
+
+input AddressInput {
+  street: String!
+  city: String!
+  state: String!
+  zipCode: String!
+  country: String!
+  coordinates: CoordinatesInput
+}
+
+input CoordinatesInput {
+  latitude: Float!
+  longitude: Float!
+}
+
+scalar DateTime
+

@@ -1,10 +1,12 @@
 import { OrderService } from '../services/order.service';
+import { RedisPubSub, orderStatusChannel } from '../pubsub/redis.pubsub';
 import { Order, OrderStatus, CreateOrderInput } from '../models/order.model';
+import { requireAuth, AuthContext, JwtPayload } from '../middleware/auth';
 
 interface Context {
-  user?: {
-    id: string;
-  };
+  auth: AuthContext;
+  user?: JwtPayload | null;
+  pubSub: RedisPubSub;
 }
 
 export class OrderResolver {
@@ -15,12 +17,10 @@ export class OrderResolver {
     args: { status?: OrderStatus; limit?: number; offset?: number },
     context: Context
   ): Promise<Order[]> {
-    if (!context.user) {
-      throw new Error('Unauthorized');
-    }
+    const user = requireAuth(context.auth);
 
     return this.orderService.getOrders(
-      context.user.id,
+      user.userId,
       args.status,
       args.limit || 20,
       args.offset || 0
@@ -32,14 +32,12 @@ export class OrderResolver {
     args: { id: string },
     context: Context
   ): Promise<Order | null> {
-    if (!context.user) {
-      throw new Error('Unauthorized');
-    }
+    const user = requireAuth(context.auth);
 
     const order = await this.orderService.getOrderById(args.id);
-    
+
     // Verify order belongs to user (or user is admin/restaurant owner)
-    if (order && order.customerId !== context.user.id) {
+    if (order && order.customerId !== user.userId) {
       throw new Error('Forbidden');
     }
 
@@ -51,11 +49,9 @@ export class OrderResolver {
     args: { input: CreateOrderInput },
     context: Context
   ): Promise<Order> {
-    if (!context.user) {
-      throw new Error('Unauthorized');
-    }
+    const user = requireAuth(context.auth);
 
-    return this.orderService.createOrder(args.input, context.user.id);
+    return this.orderService.createOrder(args.input, user.userId);
   }
 
   async updateOrderStatus(
@@ -63,9 +59,7 @@ export class OrderResolver {
     args: { id: string; status: OrderStatus },
     context: Context
   ): Promise<Order | null> {
-    if (!context.user) {
-      throw new Error('Unauthorized');
-    }
+    requireAuth(context.auth);
 
     // In production, check if user has permission (restaurant owner, admin, etc.)
     return this.orderService.updateOrderStatus(args.id, args.status);
@@ -76,35 +70,32 @@ export class OrderResolver {
     args: { id: string },
     context: Context
   ): Promise<Order | null> {
-    if (!context.user) {
-      throw new Error('Unauthorized');
-    }
+    const user = requireAuth(context.auth);
 
     const order = await this.orderService.getOrderById(args.id);
-    
+
     if (!order) {
       throw new Error('Order not found');
     }
 
-    if (order.customerId !== context.user.id) {
+    if (order.customerId !== user.userId) {
       throw new Error('Forbidden');
     }
 
     return this.orderService.cancelOrder(args.id);
   }
 
-  async subscribeToOrderStatus(
-    _parent: any,
-    _args: { orderId: string },
-    context: Context
-  ): Promise<AsyncIterator<Order>> {
-    if (!context.user) {
-      throw new Error('Unauthorized');
-    }
-
-    // Simplified subscription - in production, use GraphQL subscriptions with PubSub
-    // This is a placeholder that would need proper implementation with Redis Pub/Sub or similar
-    throw new Error('Subscriptions not fully implemented yet');
+  subscribeToOrderStatus(
+    _parent: unknown,
+    args: { orderId: string },
+    context: Context,
+  ): AsyncIterable<Order> {
+    requireAuth(context.auth);
+    // PubSubAsyncIterableIterator implements both AsyncIterator and AsyncIterable at runtime;
+    // the base-class types only declare AsyncIterator, so we cast through unknown.
+    return context.pubSub.asyncIterator<Order>(
+      orderStatusChannel(args.orderId),
+    ) as unknown as AsyncIterable<Order>;
   }
 }
 

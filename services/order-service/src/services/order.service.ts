@@ -2,6 +2,7 @@ import { createClient } from 'redis';
 import { Order, OrderStatus, CreateOrderInput } from '../models/order.model';
 import { OrderRepository } from '../repositories/order.repository';
 import { KafkaProducer } from '../events/kafka.producer';
+import { RedisPubSub, orderStatusChannel } from '../pubsub/redis.pubsub';
 import { logger } from '../utils/logger';
 
 type RedisClient = ReturnType<typeof createClient>;
@@ -12,17 +13,27 @@ export class OrderService {
   constructor(
     private orderRepository: OrderRepository,
     private redisClient: RedisClient,
-    private kafkaProducer: KafkaProducer
+    private kafkaProducer: KafkaProducer,
+    private pubSub: RedisPubSub,
   ) {}
 
   async createOrder(input: CreateOrderInput, customerId: string): Promise<Order> {
-    // Calculate total amount (simplified - in production, fetch prices from restaurant service)
-    const totalAmount = input.items.reduce((sum, item) => {
-      return sum + (item.subtotal || (item.price || 0) * item.quantity);
-    }, 0);
+    // TODO: En producción, consultar prices del restaurant-service
+    // Por ahora, usar precio default y calcular subtotales
+    const DEFAULT_ITEM_PRICE = 10.0;
+
+    const itemsWithPrices = input.items.map((item) => {
+      const price = item.price ?? DEFAULT_ITEM_PRICE;
+      const subtotal = item.subtotal ?? price * item.quantity;
+      return { ...item, price, subtotal };
+    });
+
+    // Calculate total amount
+    const totalAmount = itemsWithPrices.reduce((sum, item) => sum + item.subtotal, 0);
 
     const orderData: CreateOrderInput & { totalAmount: number } = {
       ...input,
+      items: itemsWithPrices,
       totalAmount,
     };
 
@@ -76,7 +87,10 @@ export class OrderService {
     // Update cache
     await this.cacheOrder(order);
 
-    // Publish appropriate event based on status
+    // Notify GraphQL subscribers (real-time)
+    await this.pubSub.publish(orderStatusChannel(id), order);
+
+    // Publish appropriate Kafka event based on status
     if (status === OrderStatus.ASSIGNED && deliveryPersonId) {
       await this.kafkaProducer.publishOrderAssigned({
         orderId: order.id,

@@ -20,6 +20,12 @@ build: ## Compila el proyecto
 run: ## Ejecuta el servicio en modo desarrollo
 	npm run dev
 
+migrate: ## Ejecuta migraciones
+	npm run migrate:up
+
+migrate:down: ## Revierte última migración
+	npm run migrate:down
+
 test: ## Ejecuta tests
 	npm test
 

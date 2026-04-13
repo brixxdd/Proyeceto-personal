@@ -1,5 +1,7 @@
 import { Producer } from 'kafkajs';
+import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
+import { IdempotencyService } from '../services/idempotency.service';
 
 export interface OrderCreatedEvent {
   orderId: string;
@@ -20,14 +22,36 @@ export interface OrderDeliveredEvent {
   timestamp: string;
 }
 
+/**
+ * Resultado de intentar publicar un evento
+ */
+export interface PublishResult {
+  success: boolean;
+  eventId?: string;
+  isDuplicate?: boolean;
+  error?: string;
+}
+
 export class KafkaProducer {
   private readonly ORDER_CREATED_TOPIC = process.env.KAFKA_TOPIC_ORDER_CREATED || 'order.created';
   private readonly ORDER_ASSIGNED_TOPIC = process.env.KAFKA_TOPIC_ORDER_ASSIGNED || 'order.assigned';
   private readonly ORDER_DELIVERED_TOPIC = process.env.KAFKA_TOPIC_ORDER_DELIVERED || 'order.delivered';
 
-  constructor(private producer: Producer) {}
+  constructor(
+    private producer: Producer,
+    private idempotency?: IdempotencyService,
+  ) {}
 
-  async publishOrderCreated(event: OrderCreatedEvent): Promise<void> {
+  async publishOrderCreated(event: OrderCreatedEvent): Promise<PublishResult> {
+    const eventId = uuidv4();
+
+    if (this.idempotency) {
+      const isRecorded = await this.idempotency.tryRecordEvent(eventId);
+      if (!isRecorded) {
+        return { success: false, eventId, isDuplicate: true };
+      }
+    }
+
     try {
       await this.producer.send({
         topic: this.ORDER_CREATED_TOPIC,
@@ -36,20 +60,31 @@ export class KafkaProducer {
             key: event.orderId,
             value: JSON.stringify(event),
             headers: {
+              eventId,
               eventType: 'order.created',
               timestamp: event.timestamp,
             },
           },
         ],
       });
-      logger.info(`Published order.created event for order ${event.orderId}`);
+      logger.info(`Published order.created event for order ${event.orderId} (eventId: ${eventId})`);
+      return { success: true, eventId };
     } catch (error) {
       logger.error('Failed to publish order.created event', error);
-      throw error;
+      return { success: false, eventId, error: String(error) };
     }
   }
 
-  async publishOrderAssigned(event: OrderAssignedEvent): Promise<void> {
+  async publishOrderAssigned(event: OrderAssignedEvent): Promise<PublishResult> {
+    const eventId = uuidv4();
+
+    if (this.idempotency) {
+      const isRecorded = await this.idempotency.tryRecordEvent(eventId);
+      if (!isRecorded) {
+        return { success: false, eventId, isDuplicate: true };
+      }
+    }
+
     try {
       await this.producer.send({
         topic: this.ORDER_ASSIGNED_TOPIC,
@@ -58,20 +93,31 @@ export class KafkaProducer {
             key: event.orderId,
             value: JSON.stringify(event),
             headers: {
+              eventId,
               eventType: 'order.assigned',
               timestamp: event.timestamp,
             },
           },
         ],
       });
-      logger.info(`Published order.assigned event for order ${event.orderId}`);
+      logger.info(`Published order.assigned event for order ${event.orderId} (eventId: ${eventId})`);
+      return { success: true, eventId };
     } catch (error) {
       logger.error('Failed to publish order.assigned event', error);
-      throw error;
+      return { success: false, eventId, error: String(error) };
     }
   }
 
-  async publishOrderDelivered(event: OrderDeliveredEvent): Promise<void> {
+  async publishOrderDelivered(event: OrderDeliveredEvent): Promise<PublishResult> {
+    const eventId = uuidv4();
+
+    if (this.idempotency) {
+      const isRecorded = await this.idempotency.tryRecordEvent(eventId);
+      if (!isRecorded) {
+        return { success: false, eventId, isDuplicate: true };
+      }
+    }
+
     try {
       await this.producer.send({
         topic: this.ORDER_DELIVERED_TOPIC,
@@ -80,16 +126,18 @@ export class KafkaProducer {
             key: event.orderId,
             value: JSON.stringify(event),
             headers: {
+              eventId,
               eventType: 'order.delivered',
               timestamp: event.timestamp,
             },
           },
         ],
       });
-      logger.info(`Published order.delivered event for order ${event.orderId}`);
+      logger.info(`Published order.delivered event for order ${event.orderId} (eventId: ${eventId})`);
+      return { success: true, eventId };
     } catch (error) {
       logger.error('Failed to publish order.delivered event', error);
-      throw error;
+      return { success: false, eventId, error: String(error) };
     }
   }
 }
