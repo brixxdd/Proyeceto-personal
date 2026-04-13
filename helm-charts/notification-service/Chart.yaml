@@ -1,0 +1,12 @@
+apiVersion: v2
+name: notification-service
+description: Helm chart for Notification Service microservice
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - microservice
+  - graphql
+  - notifications
+maintainers:
+  - name: Food Delivery Platform Team

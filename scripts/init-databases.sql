@@ -4,6 +4,7 @@ CREATE DATABASE auth_db;
 CREATE DATABASE restaurant_db;
 CREATE DATABASE order_db;
 CREATE DATABASE delivery_db;
+CREATE DATABASE notification_db;
 
 -- Crear usuarios específicos por base de datos (opcional, para mayor seguridad)
 -- CREATE USER auth_user WITH PASSWORD 'auth_password';

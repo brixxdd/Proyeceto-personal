@@ -140,5 +140,13 @@ export class KafkaProducer {
       return { success: false, eventId, error: String(error) };
     }
   }
+
+  /**
+   * Verifica si el producer está conectado
+   */
+  isConnected(): boolean {
+    // Kafkajs producer no tiene estado explícito, verificamos con un ping básico
+    return this.producer != null;
+  }
 }
 

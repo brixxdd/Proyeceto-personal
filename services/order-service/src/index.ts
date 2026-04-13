@@ -4,7 +4,8 @@ import express from 'express';
 import { ApolloServer } from '@apollo/server';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { expressMiddleware } from '@apollo/server/express4';
-import { makeExecutableSchema } from '@graphql-tools/schema';
+import { buildSubgraphSchema } from '@apollo/subgraph';
+import { parse } from 'graphql';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import { readFileSync } from 'fs';
@@ -57,11 +58,17 @@ const idempotencyService = new IdempotencyService(redisClient);
 // Dependency graph
 const orderRepository = new OrderRepository(dbPool);
 const kafkaProducerService = new KafkaProducer(kafkaProducer, idempotencyService);
-const orderService = new OrderService(orderRepository, redisClient, kafkaProducerService, pubSub);
+const orderService = new OrderService(
+  orderRepository,
+  redisClient,
+  kafkaProducerService,
+  pubSub,
+  process.env.RESTAURANT_SERVICE_URL || 'http://localhost:3001',
+);
 const orderResolver = new OrderResolver(orderService);
 
 // GraphQL schema + resolvers
-const typeDefs = readFileSync(join(__dirname, '../schema.graphql'), 'utf-8');
+const typeDefsString = readFileSync(join(__dirname, '../schema.graphql'), 'utf-8');
 
 const resolvers = {
   Query: {
@@ -84,7 +91,8 @@ const resolvers = {
 };
 
 // Shared schema object — consumed by both Apollo Server (HTTP) and graphql-ws (WS)
-const schema = makeExecutableSchema({ typeDefs, resolvers });
+// buildSubgraphSchema exposes _service { sdl } required by Apollo Federation IntrospectAndCompose
+const schema = buildSubgraphSchema([{ typeDefs: parse(typeDefsString), resolvers }]);
 
 // Health check endpoint
 app.get('/health', async (_req, res) => {
@@ -124,7 +132,9 @@ app.get('/metrics', async (_req, res) => {
       connectionStatus.set({ service: 'redis' }, 0);
     }
 
-    connectionStatus.set({ service: 'kafka' }, kafkaProducer.isRunning() ? 1 : 0);
+    // Check Kafka producer status
+    const kafkaStatus = kafkaProducerService.isConnected() ? 1 : 0;
+    connectionStatus.set({ service: 'kafka' }, kafkaStatus);
 
     const metrics = await metricsRegister.metrics();
     res.set('Content-Type', metricsRegister.contentType);

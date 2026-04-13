@@ -1,0 +1,73 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key"])
+
+type Query {
+  delivery(id: ID!): Delivery
+  deliveries(orderId: ID, status: DeliveryStatus): [Delivery!]!
+  availableDrivers: [DeliveryPerson!]!
+  deliveryPerson(id: ID!): DeliveryPerson
+}
+
+type Mutation {
+  updateDriverStatus(id: ID!, status: DriverStatus!, location: LocationInput): DeliveryPerson!
+  updateDeliveryStatus(id: ID!, status: DeliveryStatus!): Delivery!
+}
+
+type Subscription {
+  deliveryStatusChanged(deliveryId: ID!): Delivery!
+  driverAssigned(orderId: ID!): Delivery!
+}
+
+type DeliveryPerson @key(fields: "id") {
+  id: ID!
+  name: String!
+  status: DriverStatus!
+  currentLocation: Location
+  rating: Float!
+  vehicleType: VehicleType!
+}
+
+type Delivery @key(fields: "id") {
+  id: ID!
+  orderId: ID!
+  deliveryPersonId: ID!
+  status: DeliveryStatus!
+  pickupTime: DateTime
+  deliveryTime: DateTime
+  currentLocation: Location
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Location {
+  latitude: Float!
+  longitude: Float!
+}
+
+enum DriverStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+}
+
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum VehicleType {
+  BICYCLE
+  MOTORCYCLE
+  CAR
+}
+
+input LocationInput {
+  latitude: Float!
+  longitude: Float!
+}
+
+scalar DateTime

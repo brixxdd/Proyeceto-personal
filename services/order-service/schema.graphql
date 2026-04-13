@@ -1,3 +1,6 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key"])
+
 type Query {
   orders(status: OrderStatus, limit: Int, offset: Int): [Order!]!
   order(id: ID!): Order
@@ -13,7 +16,7 @@ type Subscription {
   orderStatusChanged(orderId: ID!): Order!
 }
 
-type Order {
+type Order @key(fields: "id") {
   id: ID!
   customerId: ID!
   restaurantId: ID!

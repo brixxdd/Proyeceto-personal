@@ -1,24 +1,29 @@
 import 'dotenv/config';
+import { createServer } from 'http';
 import express from 'express';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloGateway, IntrospectAndCompose, RemoteGraphQLDataSource } from '@apollo/gateway';
 import cors from 'cors';
-import { createClient, RedisClientType } from 'redis';
+import { createClient as createRedisClient } from 'redis';
 import rateLimit from 'express-rate-limit';
-import { RedisStore } from 'rate-limit-redis';
+import { WebSocketServer } from 'ws';
+import WebSocket from 'ws';
 import { logger } from './utils/logger';
 import { getContextFromRequest } from './middleware/auth';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const httpServer = createServer(app);
+const ORDER_SERVICE_WS_URL =
+  process.env.ORDER_SERVICE_WS_URL || 'ws://localhost:3000/graphql';
 
 // Redis client for rate limiting
-let redisClient: RedisClientType | null = null;
+let redisClient: any = null;
 
-async function initializeRedis(): Promise<RedisClientType | null> {
+async function initializeRedis(): Promise<any> {
   try {
-    const client = createClient({
+    const client = createRedisClient({
       url: process.env.REDIS_URL || 'redis://localhost:6379',
     });
 
@@ -36,42 +41,10 @@ async function initializeRedis(): Promise<RedisClientType | null> {
 }
 
 // Rate limiting middleware
-function setupRateLimiter(redis: RedisClientType | null) {
+function setupRateLimiter(_redis: any) {
   const windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'); // 15 min
   const maxRequests = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100');
 
-  if (redis) {
-    // Redis-backed rate limiter
-    const limiter = rateLimit({
-      store: new RedisStore({
-        // @ts-ignore - rate-limit-redis types compatibility
-        sendCommand: (...args: string[]) => redis.sendCommand(args),
-      }) as any,
-      windowMs,
-      max: maxRequests,
-      message: { error: 'Too many requests, please try again later' },
-      standardHeaders: true,
-      legacyHeaders: false,
-      keyGenerator: (req) => {
-        // Rate limit by user if authenticated, otherwise by IP
-        const authHeader = req.headers.authorization;
-        if (authHeader) {
-          try {
-            const { verifyToken } = require('./middleware/auth');
-            const token = authHeader.replace('Bearer ', '');
-            const decoded = verifyToken(token);
-            return `user:${decoded.userId}`;
-          } catch {
-            // Fall back to IP
-          }
-        }
-        return `ip:${req.ip || 'unknown'}`;
-      },
-    });
-    return limiter;
-  }
-
-  // In-memory rate limiter (development only)
   return rateLimit({
     windowMs,
     max: maxRequests,
@@ -90,12 +63,10 @@ const gateway = new ApolloGateway({
       { name: 'order', url: process.env.ORDER_SERVICE_URL || 'http://localhost:3000/graphql' },
     ],
   }),
-  // Handle subgraph errors gracefully
   buildService({ name, url }) {
     return new RemoteGraphQLDataSource({
       url,
       willSendRequest({ request, context }: { request: any; context: any }) {
-        // Forward user context to subgraphs
         if (context?.user) {
           request.http?.headers.set('x-user-id', context.user.userId);
           request.http?.headers.set('x-user-email', context.user.email);
@@ -133,7 +104,6 @@ app.get('/health', async (req, res) => {
     }
   }
 
-  // Check Redis
   if (redisClient?.isOpen) {
     try {
       await redisClient.ping();
@@ -154,14 +124,11 @@ app.get('/health', async (req, res) => {
 });
 
 async function startServer() {
-  // Initialize Redis
   redisClient = await initializeRedis();
 
-  // Setup rate limiting
   const rateLimiter = setupRateLimiter(redisClient);
   app.use(rateLimiter);
 
-  // Start Apollo Server
   const server = new ApolloServer({
     gateway,
     introspection: process.env.NODE_ENV !== 'production',
@@ -180,10 +147,66 @@ async function startServer() {
     })
   );
 
-  app.listen(PORT, () => {
-    logger.info(`API Gateway running on port ${PORT}`);
-    logger.info(`GraphQL endpoint: http://localhost:${PORT}/graphql`);
-    logger.info(`Subgraphs: auth(${process.env.AUTH_SERVICE_URL || 'localhost:3002'}), restaurant(${process.env.RESTAURANT_SERVICE_URL || 'localhost:3001'}), order(${process.env.ORDER_SERVICE_URL || 'localhost:3000'})`);
+  // ── WebSocket proxy for GraphQL Subscriptions ───────────────────────────
+  // Apollo Federation gateway does not natively support subscription forwarding.
+  // Raw WebSocket proxy: pipe graphql-transport-ws messages bidirectionally
+  // to the order-service. Auth token in connection_init flows through as-is.
+  const wsServer = new WebSocketServer({
+    server: httpServer,
+    path: '/graphql',
+    handleProtocols: (protocols) => {
+      if (protocols.has('graphql-transport-ws')) return 'graphql-transport-ws';
+      if (protocols.has('graphql-ws')) return 'graphql-ws';
+      return false;
+    },
+  });
+
+  wsServer.on('connection', (downstream) => {
+    const protocol = downstream.protocol || 'graphql-transport-ws';
+    const upstream = new WebSocket(ORDER_SERVICE_WS_URL, protocol);
+    const queue: WebSocket.RawData[] = [];
+
+    upstream.on('open', () => {
+      for (const msg of queue) upstream.send(msg);
+      queue.length = 0;
+    });
+
+    downstream.on('message', (data) => {
+      if (upstream.readyState === WebSocket.OPEN) {
+        upstream.send(data);
+      } else {
+        queue.push(data);
+      }
+    });
+
+    upstream.on('message', (data) => {
+      if (downstream.readyState === WebSocket.OPEN) downstream.send(data);
+    });
+
+    downstream.on('close', (code, reason) => {
+      if (upstream.readyState < WebSocket.CLOSING) upstream.close(code, reason);
+    });
+    upstream.on('close', (code, reason) => {
+      if (downstream.readyState < WebSocket.CLOSING) downstream.close(code, reason);
+    });
+
+    downstream.on('error', (err) => logger.error('WS downstream error', err));
+    upstream.on('error', (err) => logger.error('WS upstream error', err));
+  });
+
+  logger.info(`WebSocket subscription proxy ready — upstream: ${ORDER_SERVICE_WS_URL}`);
+
+  await new Promise<void>((resolve) => httpServer.listen(PORT, resolve));
+
+  logger.info(`API Gateway running on port ${PORT}`);
+  logger.info(`GraphQL endpoint: http://localhost:${PORT}/graphql`);
+  logger.info(`GraphQL WebSocket: ws://localhost:${PORT}/graphql`);
+  logger.info(`Subgraphs: auth(${process.env.AUTH_SERVICE_URL || 'localhost:3002'}), restaurant(${process.env.RESTAURANT_SERVICE_URL || 'localhost:3001'}), order(${process.env.ORDER_SERVICE_URL || 'localhost:3000'})`);
+
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM received, shutting down api-gateway');
+    wsServer.close();
+    process.exit(0);
   });
 }
 

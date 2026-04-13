@@ -4,6 +4,7 @@ import { OrderRepository } from '../repositories/order.repository';
 import { KafkaProducer } from '../events/kafka.producer';
 import { RedisPubSub, orderStatusChannel } from '../pubsub/redis.pubsub';
 import { logger } from '../utils/logger';
+import { fetchMenuItemPrices } from '../clients/restaurant.client';
 
 type RedisClient = ReturnType<typeof createClient>;
 
@@ -15,16 +16,16 @@ export class OrderService {
     private redisClient: RedisClient,
     private kafkaProducer: KafkaProducer,
     private pubSub: RedisPubSub,
+    private restaurantServiceUrl: string = process.env.RESTAURANT_SERVICE_URL || 'http://localhost:3001',
   ) {}
 
   async createOrder(input: CreateOrderInput, customerId: string): Promise<Order> {
-    // TODO: En producción, consultar prices del restaurant-service
-    // Por ahora, usar precio default y calcular subtotales
-    const DEFAULT_ITEM_PRICE = 10.0;
+    const menuItemIds = input.items.map((item) => item.menuItemId);
+    const priceMap = await fetchMenuItemPrices(menuItemIds, this.restaurantServiceUrl);
 
     const itemsWithPrices = input.items.map((item) => {
-      const price = item.price ?? DEFAULT_ITEM_PRICE;
-      const subtotal = item.subtotal ?? price * item.quantity;
+      const { price } = priceMap.get(item.menuItemId)!;
+      const subtotal = price * item.quantity;
       return { ...item, price, subtotal };
     });
 

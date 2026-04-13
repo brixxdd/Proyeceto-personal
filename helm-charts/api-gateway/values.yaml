@@ -1,0 +1,122 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/food-delivery-platform/api-gateway
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1001
+  runAsNonRoot: true
+  runAsUser: 1001
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+
+service:
+  type: ClusterIP
+  port: 4000
+  targetPort: 4000
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: api-gateway.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+env:
+  - name: NODE_ENV
+    value: "production"
+  - name: PORT
+    value: "4000"
+  - name: RATE_LIMIT_WINDOW_MS
+    value: "900000"
+  - name: RATE_LIMIT_MAX_REQUESTS
+    value: "100"
+  - name: REDIS_URL
+    valueFrom:
+      secretKeyRef:
+        name: api-gateway-secrets
+        key: redis-url
+  - name: JWT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: api-gateway-secrets
+        key: jwt-secret
+
+configMap:
+  enabled: true
+  data:
+    AUTH_SERVICE_URL: "http://auth-service:3000/graphql"
+    RESTAURANT_SERVICE_URL: "http://restaurant-service:3001/graphql"
+    ORDER_SERVICE_URL: "http://order-service:3000/graphql"
+    ORDER_SERVICE_WS_URL: "ws://order-service:3000/graphql"
+
+secrets:
+  enabled: true
+  redis-url: ""
+  jwt-secret: ""
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics

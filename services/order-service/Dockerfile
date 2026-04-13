@@ -7,14 +7,15 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Instalar dependencias
-RUN npm ci --only=production && npm cache clean --force
+# Instalar todas las dependencias (incluyendo dev para build)
+RUN npm ci && npm cache clean --force
 
-# Copiar código fuente
+# Copiar código fuente y schema
 COPY src/ ./src/
+COPY schema.graphql ./schema.graphql
 
 # Compilar TypeScript
-RUN npm run build
+RUN npx tsc
 
 # Stage de producción
 FROM node:20-alpine AS production
@@ -25,10 +26,11 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Copiar dependencias y código compilado
+# Copiar dependencias, código compilado y schema
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nodejs:nodejs /app/schema.graphql ./schema.graphql
 
 # Cambiar a usuario no-root
 USER nodejs

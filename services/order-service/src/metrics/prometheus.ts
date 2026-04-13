@@ -1,4 +1,4 @@
-import client from 'prom-client';
+import client, { collectDefaultMetrics } from 'prom-client';
 
 /**
  * Registry global de métricas para Prometheus.
@@ -8,8 +8,7 @@ export const register = new client.Registry();
 
 // ── Métricas por defecto de Node.js ────────────────────────────────────────
 // Colecta: event loop lag, heap memory, GC, handles activos, etc.
-const collectDefaultMetrics = client.collectDefaultMetrics;
-register.registerCollector(new collectDefaultMetrics());
+collectDefaultMetrics({ register });
 
 // ── Métricas de negocio ────────────────────────────────────────────────────
 

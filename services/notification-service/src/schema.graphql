@@ -1,0 +1,55 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key"])
+
+type Query {
+  notifications(userId: ID!, limit: Int, offset: Int): [Notification!]!
+  notificationPreferences(userId: ID!): NotificationPreference
+  unreadCount(userId: ID!): Int!
+}
+
+type Mutation {
+  updateNotificationPreferences(userId: ID!, input: NotificationPreferenceInput!): NotificationPreference!
+  markNotificationRead(id: ID!): Notification!
+  markAllRead(userId: ID!): Boolean!
+}
+
+type Subscription {
+  newNotification(userId: ID!): Notification!
+}
+
+type Notification @key(fields: "id") {
+  id: ID!
+  userId: ID!
+  type: NotificationType!
+  title: String!
+  message: String!
+  read: Boolean!
+  metadata: String
+  createdAt: DateTime!
+}
+
+type NotificationPreference {
+  userId: ID!
+  emailEnabled: Boolean!
+  smsEnabled: Boolean!
+  pushEnabled: Boolean!
+  updatedAt: DateTime!
+}
+
+enum NotificationType {
+  ORDER_CREATED
+  ORDER_CONFIRMED
+  ORDER_ASSIGNED
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  DELIVERY_ASSIGNED
+  SYSTEM
+}
+
+input NotificationPreferenceInput {
+  emailEnabled: Boolean!
+  smsEnabled: Boolean!
+  pushEnabled: Boolean!
+}
+
+scalar DateTime

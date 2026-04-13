@@ -1,0 +1,136 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/food-delivery-platform/notification-service
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "3004"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  fsGroup: 1001
+  runAsNonRoot: true
+  runAsUser: 1001
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+
+service:
+  type: ClusterIP
+  port: 3004
+  targetPort: 3004
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: notification-service.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+env:
+  - name: NODE_ENV
+    value: "production"
+  - name: PORT
+    value: "3004"
+  - name: DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: notification-service-secrets
+        key: database-url
+  - name: REDIS_URL
+    valueFrom:
+      secretKeyRef:
+        name: notification-service-secrets
+        key: redis-url
+  - name: KAFKA_BROKERS
+    valueFrom:
+      secretKeyRef:
+        name: notification-service-secrets
+        key: kafka-brokers
+  - name: KAFKA_CLIENT_ID
+    value: "notification-service"
+  - name: KAFKA_GROUP_ID
+    value: "notification-service-group"
+  - name: KAFKA_TOPIC_ORDER_CREATED
+    value: "order.created"
+  - name: KAFKA_TOPIC_ORDER_ASSIGNED
+    value: "order.assigned"
+  - name: KAFKA_TOPIC_ORDER_DELIVERED
+    value: "order.delivered"
+  - name: KAFKA_TOPIC_ORDER_CANCELLED
+    value: "order.cancelled"
+  - name: KAFKA_TOPIC_DELIVERY_ASSIGNED
+    value: "delivery.assigned"
+
+configMap:
+  enabled: true
+  data: {}
+
+secrets:
+  enabled: true
+  database-url: ""
+  redis-url: ""
+  kafka-brokers: ""
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  path: /metrics
