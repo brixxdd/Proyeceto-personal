@@ -40,51 +40,27 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: order_db_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-    
+    # Unit tests mock pg.Pool, Redis and Kafka — no real services needed
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: services/order-service/package-lock.json
-      
+
       - name: Install dependencies
         working-directory: ./services/order-service
         run: npm ci
-      
-      - name: Run tests
+
+      - name: Run tests with coverage
         working-directory: ./services/order-service
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/order_db_test
-          REDIS_URL: redis://localhost:6379
-        run: npm test
+          NODE_ENV: test
+          JWT_SECRET: test-jwt-secret
+        run: npm run test:coverage
       
       - name: Upload coverage
         uses: codecov/codecov-action@v3
