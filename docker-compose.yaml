@@ -335,6 +335,32 @@ services:
       - "3010:3000"
     depends_on:
       - prometheus
+      - loki
+    restart: unless-stopped
+    networks:
+      - food-delivery-network
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: food-delivery-loki
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./observability/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    restart: unless-stopped
+    networks:
+      - food-delivery-network
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: food-delivery-promtail
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./observability/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
     restart: unless-stopped
     networks:
       - food-delivery-network
@@ -363,6 +389,7 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+  loki_data:
 
 networks:
   food-delivery-network:
