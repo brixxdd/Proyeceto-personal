@@ -30,7 +30,7 @@ receivers:
 
   - name: 'slack'
     slack_configs:
-      - api_url: '${SLACK_WEBHOOK_URL}'
+      - api_url: 'https://hooks.slack.com/services/REPLACE_WITH_REAL_WEBHOOK'
         channel: '#alerts'
         send_resolved: true
         title: '{{ if eq .Status "firing" }}:red_circle:{{ else }}:large_green_circle:{{ end }} [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
@@ -45,12 +45,12 @@ receivers:
 
   - name: 'email'
     email_configs:
-      - to: '${ALERT_EMAIL_TO}'
-        require_tls: true
+      - to: 'alerts@food-delivery.local'
+        require_tls: false
         send_resolved: true
         headers:
           Subject: '[{{ .Status | toUpper }}] Food Delivery Alert: {{ .CommonLabels.alertname }}'
-        body: |
+        text: |
           {{ range .Alerts }}
           Alert: {{ .Labels.alertname }}
           Service: {{ .Labels.job }}
