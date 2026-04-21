@@ -1,4 +1,4 @@
-import { Kafka, Consumer, EachMessagePayload } from 'kafkajs';
+import { Kafka, Consumer, Producer, EachMessagePayload } from 'kafkajs';
 import { logger } from '../utils/logger';
 import { NotificationService } from '../services/notification.service';
 import { sendEmail } from '../providers/email.provider';
@@ -36,8 +36,37 @@ interface DeliveryAssignedPayload {
   timestamp: string;
 }
 
+const DLQ_MAP: Record<string, string> = {
+  'order.created': 'order.created.dlq',
+  'order.assigned': 'order.assigned.dlq',
+  'order.cancelled': 'order.cancelled.dlq',
+  'delivery.assigned': 'delivery.assigned.dlq',
+};
+
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelayMs = 1000,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        logger.warn(`Retry attempt ${attempt + 1}/${maxRetries} in ${delay}ms`, { error });
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export class NotificationKafkaConsumer {
   private consumer: Consumer;
+  private producer: Producer;
   private connected = false;
 
   constructor(private readonly notificationService: NotificationService) {
@@ -49,10 +78,12 @@ export class NotificationKafkaConsumer {
     this.consumer = kafka.consumer({
       groupId: process.env.KAFKA_GROUP_ID || 'notification-service-group',
     });
+    this.producer = kafka.producer();
   }
 
   async connect(): Promise<void> {
     await this.consumer.connect();
+    await this.producer.connect();
     this.connected = true;
     logger.info('Kafka consumer connected');
   }
@@ -78,21 +109,43 @@ export class NotificationKafkaConsumer {
 
         if (!message.value) return;
 
+        const rawValue = message.value.toString();
         let data: unknown;
         try {
-          data = JSON.parse(message.value.toString());
+          data = JSON.parse(rawValue);
         } catch (err) {
           logger.error('Failed to parse Kafka message', { topic, err });
           return;
         }
 
         try {
-          await this.handleMessage(topic, data);
+          await retryWithBackoff(() => this.handleMessage(topic, data));
         } catch (err) {
-          logger.error('Error handling Kafka message', { topic, err });
+          logger.error('Max retries exceeded for topic, sending to DLQ', { topic, err });
+          await this.sendToDlq(topic, rawValue, err);
         }
       },
     });
+  }
+
+  private async sendToDlq(originalTopic: string, rawValue: string, error: unknown): Promise<void> {
+    const dlqTopic = DLQ_MAP[originalTopic] ?? `${originalTopic}.dlq`;
+    try {
+      await this.producer.send({
+        topic: dlqTopic,
+        messages: [{
+          value: rawValue,
+          headers: {
+            originalTopic,
+            errorMessage: String(error),
+            failedAt: new Date().toISOString(),
+          },
+        }],
+      });
+      logger.info(`Message sent to DLQ ${dlqTopic}`);
+    } catch (dlqError) {
+      logger.error(`Failed to send message to DLQ ${dlqTopic}`, dlqError);
+    }
   }
 
   private async handleMessage(topic: string, data: unknown): Promise<void> {
@@ -209,6 +262,7 @@ export class NotificationKafkaConsumer {
 
   async disconnect(): Promise<void> {
     await this.consumer.disconnect();
+    await this.producer.disconnect();
     this.connected = false;
     logger.info('Kafka consumer disconnected');
   }

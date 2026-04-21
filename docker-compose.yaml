@@ -1,19 +1,98 @@
 version: '3.8'
 
 services:
-  # PostgreSQL - Múltiples bases de datos
-  postgres:
+  # PostgreSQL - Auth Service
+  postgres-auth:
     image: postgres:15-alpine
-    container_name: food-delivery-postgres
+    container_name: food-delivery-postgres-auth
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+      POSTGRES_DB: auth_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+      - postgres_auth_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - food-delivery-network
+
+  # PostgreSQL - Restaurant Service
+  postgres-restaurant:
+    image: postgres:15-alpine
+    container_name: food-delivery-postgres-restaurant
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: restaurant_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_restaurant_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - food-delivery-network
+
+  # PostgreSQL - Order Service
+  postgres-order:
+    image: postgres:15-alpine
+    container_name: food-delivery-postgres-order
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: order_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_order_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - food-delivery-network
+
+  # PostgreSQL - Delivery Service
+  postgres-delivery:
+    image: postgres:15-alpine
+    container_name: food-delivery-postgres-delivery
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: delivery_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_delivery_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - food-delivery-network
+
+  # PostgreSQL - Notification Service
+  postgres-notification:
+    image: postgres:15-alpine
+    container_name: food-delivery-postgres-notification
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notification_db
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres_notification_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -85,13 +164,13 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/order_db
+      DATABASE_URL: postgresql://postgres:postgres@postgres-order:5432/order_db
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:29092
     ports:
       - "3000:3000"
     depends_on:
-      postgres:
+      postgres-order:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -109,12 +188,12 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3001
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/restaurant_db
+      DATABASE_URL: postgresql://postgres:postgres@postgres-restaurant:5432/restaurant_db
       REDIS_URL: redis://redis:6379
     ports:
       - "3001:3001"
     depends_on:
-      postgres:
+      postgres-restaurant:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -130,7 +209,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3002
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/auth_db
+      DATABASE_URL: postgresql://postgres:postgres@postgres-auth:5432/auth_db
       REDIS_URL: redis://redis:6379
       JWT_SECRET: your-secret-key-change-in-production
       JWT_EXPIRES_IN: 1h
@@ -139,7 +218,7 @@ services:
     ports:
       - "3002:3002"
     depends_on:
-      postgres:
+      postgres-auth:
         condition: service_healthy
     networks:
       - food-delivery-network
@@ -176,7 +255,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3003
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/delivery_db
+      DATABASE_URL: postgresql://postgres:postgres@postgres-delivery:5432/delivery_db
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:29092
       KAFKA_CLIENT_ID: delivery-service
@@ -184,7 +263,7 @@ services:
     ports:
       - "3003:3003"
     depends_on:
-      postgres:
+      postgres-delivery:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -202,7 +281,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3004
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/notification_db
+      DATABASE_URL: postgresql://postgres:postgres@postgres-notification:5432/notification_db
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:29092
       KAFKA_CLIENT_ID: notification-service
@@ -210,7 +289,7 @@ services:
     ports:
       - "3004:3004"
     depends_on:
-      postgres:
+      postgres-notification:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -235,7 +314,11 @@ services:
       - food-delivery-network
 
 volumes:
-  postgres_data:
+  postgres_auth_data:
+  postgres_restaurant_data:
+  postgres_order_data:
+  postgres_delivery_data:
+  postgres_notification_data:
   redis_data:
 
 networks:
@@ -243,4 +326,3 @@ networks:
     driver: bridge
 
 # Run seed: node scripts/seed.js
-

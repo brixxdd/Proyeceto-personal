@@ -72,7 +72,7 @@ const deliveryService = new DeliveryService(
   kafkaProducerService,
   pubSub,
 );
-const kafkaConsumer = new KafkaConsumer(kafkaRawConsumer, deliveryService);
+const kafkaConsumer = new KafkaConsumer(kafkaRawConsumer, deliveryService, kafkaRawProducer);
 const deliveryResolver = new DeliveryResolver(deliveryService);
 
 // GraphQL schema + resolvers
