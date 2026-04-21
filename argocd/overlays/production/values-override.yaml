@@ -1,0 +1,46 @@
+# Production value overrides
+# Apply per-service with: helm upgrade <release> helm-charts/<service> -f argocd/overlays/production/values-override.yaml
+# In ArgoCD, add this file to the Application's spec.source.helm.valueFiles list after values.yaml.
+
+replicaCount: 3
+
+image:
+  tag: "latest"   # Overwritten by CI via sed on values.yaml; set explicitly here for manual deploys
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 65
+  targetMemoryUtilizationPercentage: 75
+
+# Enable Prometheus ServiceMonitor in production
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  path: /metrics
+
+# Spread pods across availability zones
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: Exists
+          topologyKey: topology.kubernetes.io/zone
+
+tolerations: []
+
+nodeSelector:
+  role: application

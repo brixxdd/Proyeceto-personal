@@ -164,12 +164,10 @@ jobs:
           git push
 
       - name: Sync ArgoCD Application
-        uses: kubectl-action/kubectl@master
+        uses: argoproj/argocd-action@master
         with:
-          kubectl-version: 'latest'
-        env:
-          KUBECONFIG: ${{ secrets.KUBECONFIG }}
-        run: |
-          kubectl patch application api-gateway -n argocd \
-            --type merge \
-            -p '{"operation":{"initiatedBy":{"username":"github-actions"},"sync":{"revision":"HEAD"}}}'
+          address: ${{ secrets.ARGOCD_SERVER }}
+          token: ${{ secrets.ARGOCD_TOKEN }}
+          appName: api-gateway
+          command: app sync
+          options: --prune --timeout 120

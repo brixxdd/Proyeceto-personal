@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: food-delivery
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Food delivery platform microservices
+
+  sourceRepos:
+    - https://github.com/brixxdd/Proyeceto-personal
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: food-delivery
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: "apps"
+      kind: Deployment
+    - group: ""
+      kind: Service
+    - group: "autoscaling"
+      kind: HorizontalPodAutoscaler
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: ServiceAccount
+    - group: "monitoring.coreos.com"
+      kind: ServiceMonitor
+
+  orphanedResources:
+    warn: true
