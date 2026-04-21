@@ -126,7 +126,7 @@ describe('GraphQL Resolvers', () => {
       mockAuthService.login.mockResolvedValue(mockAuthPayload);
 
       // Act
-      const result = await resolvers.Mutation.login(null, loginArgs);
+      const result = await resolvers.Mutation.login(null, loginArgs, {});
 
       // Assert
       expect(mockAuthService.login).toHaveBeenCalledWith({
@@ -143,7 +143,7 @@ describe('GraphQL Resolvers', () => {
 
       // Act & Assert
       await expect(
-        resolvers.Mutation.login(null, loginArgs)
+        resolvers.Mutation.login(null, loginArgs, {})
       ).rejects.toThrow('Invalid credentials');
     });
   });

@@ -56,6 +56,10 @@ describe('Restaurant Resolvers', () => {
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
 
+  const mockContext = {
+    user: { userId: 'owner-uuid-123', email: 'owner@test.com', role: 'RESTAURANT_OWNER' },
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     initializeResolvers(mockRestaurantService as any);
@@ -151,16 +155,17 @@ describe('Restaurant Resolvers', () => {
       description: 'A new restaurant',
       address: '456 New St',
       cuisineType: 'Mexican',
-      ownerId: 'owner-uuid',
       phone: '+0987654321',
     };
 
     it('should create a restaurant and return it', async () => {
       mockRestaurantService.createRestaurant.mockResolvedValue(mockRestaurant);
 
-      const result = await resolvers.Mutation.createRestaurant(null!, createArgs);
+      const result = await resolvers.Mutation.createRestaurant(null!, createArgs, mockContext);
 
-      expect(mockRestaurantService.createRestaurant).toHaveBeenCalledWith(createArgs);
+      expect(mockRestaurantService.createRestaurant).toHaveBeenCalledWith(
+        expect.objectContaining({ ...createArgs, ownerId: mockContext.user.userId })
+      );
       expect(result).toEqual(mockRestaurant);
     });
   });
@@ -173,43 +178,45 @@ describe('Restaurant Resolvers', () => {
     };
 
     it('should update a restaurant and return it', async () => {
+      mockRestaurantService.getRestaurantById.mockResolvedValue(mockRestaurant);
       mockRestaurantService.updateRestaurant.mockResolvedValue({
         ...mockRestaurant,
         name: 'Updated Name',
         isOpen: false,
       });
 
-      const result = await resolvers.Mutation.updateRestaurant(null!, updateArgs);
+      const result = await resolvers.Mutation.updateRestaurant(null!, updateArgs, mockContext);
 
       expect(mockRestaurantService.updateRestaurant).toHaveBeenCalledWith(updateArgs);
       expect(result).toHaveProperty('name', 'Updated Name');
     });
 
     it('should throw error when restaurant not found', async () => {
-      mockRestaurantService.updateRestaurant.mockResolvedValue(null);
+      mockRestaurantService.getRestaurantById.mockResolvedValue(null);
 
       await expect(
-        resolvers.Mutation.updateRestaurant(null!, updateArgs)
+        resolvers.Mutation.updateRestaurant(null!, updateArgs, mockContext)
       ).rejects.toThrow('Restaurant not found');
     });
   });
 
   describe('Mutation: deleteRestaurant', () => {
     it('should delete a restaurant and return true', async () => {
+      mockRestaurantService.getRestaurantById.mockResolvedValue(mockRestaurant);
       mockRestaurantService.deleteRestaurant.mockResolvedValue(true);
 
-      const result = await resolvers.Mutation.deleteRestaurant(null!, { id: 'rest-uuid-123' });
+      const result = await resolvers.Mutation.deleteRestaurant(null!, { id: 'rest-uuid-123' }, mockContext);
 
       expect(mockRestaurantService.deleteRestaurant).toHaveBeenCalledWith('rest-uuid-123');
       expect(result).toBe(true);
     });
 
-    it('should return false when restaurant not found', async () => {
-      mockRestaurantService.deleteRestaurant.mockResolvedValue(false);
+    it('should throw error when restaurant not found', async () => {
+      mockRestaurantService.getRestaurantById.mockResolvedValue(null);
 
-      const result = await resolvers.Mutation.deleteRestaurant(null!, { id: 'non-existent' });
-
-      expect(result).toBe(false);
+      await expect(
+        resolvers.Mutation.deleteRestaurant(null!, { id: 'non-existent' }, mockContext)
+      ).rejects.toThrow('Restaurant not found');
     });
   });
 
@@ -224,9 +231,10 @@ describe('Restaurant Resolvers', () => {
     };
 
     it('should create a menu item and return it', async () => {
+      mockRestaurantService.getRestaurantById.mockResolvedValue(mockRestaurant);
       mockRestaurantService.createMenuItem.mockResolvedValue(mockMenuItem);
 
-      const result = await resolvers.Mutation.createMenuItem(null!, createArgs);
+      const result = await resolvers.Mutation.createMenuItem(null!, createArgs, mockContext);
 
       expect(mockRestaurantService.createMenuItem).toHaveBeenCalledWith(createArgs);
       expect(result).toEqual(mockMenuItem);
@@ -241,43 +249,47 @@ describe('Restaurant Resolvers', () => {
     };
 
     it('should update a menu item and return it', async () => {
+      mockRestaurantService.getMenuItemById.mockResolvedValue(mockMenuItem);
+      mockRestaurantService.getRestaurantById.mockResolvedValue(mockRestaurant);
       mockRestaurantService.updateMenuItem.mockResolvedValue({
         ...mockMenuItem,
         name: 'Updated Pizza',
         price: 15.99,
       });
 
-      const result = await resolvers.Mutation.updateMenuItem(null!, updateArgs);
+      const result = await resolvers.Mutation.updateMenuItem(null!, updateArgs, mockContext);
 
       expect(mockRestaurantService.updateMenuItem).toHaveBeenCalledWith(updateArgs);
       expect(result).toHaveProperty('name', 'Updated Pizza');
     });
 
     it('should throw error when menu item not found', async () => {
-      mockRestaurantService.updateMenuItem.mockResolvedValue(null);
+      mockRestaurantService.getMenuItemById.mockResolvedValue(null);
 
       await expect(
-        resolvers.Mutation.updateMenuItem(null!, updateArgs)
+        resolvers.Mutation.updateMenuItem(null!, updateArgs, mockContext)
       ).rejects.toThrow('Menu item not found');
     });
   });
 
   describe('Mutation: deleteMenuItem', () => {
     it('should delete a menu item and return true', async () => {
+      mockRestaurantService.getMenuItemById.mockResolvedValue(mockMenuItem);
+      mockRestaurantService.getRestaurantById.mockResolvedValue(mockRestaurant);
       mockRestaurantService.deleteMenuItem.mockResolvedValue(true);
 
-      const result = await resolvers.Mutation.deleteMenuItem(null!, { id: 'menu-uuid-123' });
+      const result = await resolvers.Mutation.deleteMenuItem(null!, { id: 'menu-uuid-123' }, mockContext);
 
       expect(mockRestaurantService.deleteMenuItem).toHaveBeenCalledWith('menu-uuid-123');
       expect(result).toBe(true);
     });
 
-    it('should return false when menu item not found', async () => {
-      mockRestaurantService.deleteMenuItem.mockResolvedValue(false);
+    it('should throw error when menu item not found', async () => {
+      mockRestaurantService.getMenuItemById.mockResolvedValue(null);
 
-      const result = await resolvers.Mutation.deleteMenuItem(null!, { id: 'non-existent' });
-
-      expect(result).toBe(false);
+      await expect(
+        resolvers.Mutation.deleteMenuItem(null!, { id: 'non-existent' }, mockContext)
+      ).rejects.toThrow('Menu item not found');
     });
   });
 
