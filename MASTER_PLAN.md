@@ -1,6 +1,6 @@
 # 🎯 MASTER PLAN — Plataforma de Pedidos en Tiempo Real
 
-> **Progreso Total: ~87%** | Última actualización: 2026-04-20
+> **Progreso Total: ~92%** | Última actualización: 2026-04-20
 >
 > Converge: ROADMAP, IMPLEMENTATION_STATUS, PRIORITY_PLAN, NEXT_STEPS, QUICK_START, LA_VISION, PROJECT_STRUCTURE
 
@@ -31,14 +31,15 @@ Plataforma cloud-native distribuida, escalable. Inspirada en Uber Eats. Microser
 | **delivery-service** | 100% | ✅ Completo | Kafka consumers ✅, retry/backoff+DLQ ✅, GraphQL subscriptions ✅, Helm ✅, 48 tests ✅ |
 | **notification-service** | 100% | ✅ Completo | 5 Kafka consumers ✅, retry/backoff+DLQ ✅, mock email/SMS ✅, subscriptions ✅, Helm ✅, 33 tests ✅ |
 | **Kafka** | 100% | ✅ Completo | Init script ✅, consumer groups ✅, DLQs ✅, retry/backoff exponencial ✅ |
-| **CI/CD** | 85% | 🚧 Avanzando | 6 workflows GitHub Actions ✅, ArgoCD app-of-apps ✅ — falta Alertmanager, deployment runbooks |
-| **Observabilidad** | 100% | ✅ Completo | Prometheus ✅, Grafana 3 dashboards ✅, Loki+Promtail ✅ (logs centralizados) |
+| **CI/CD** | 90% | ✅ Avanzando | 6 workflows ✅, ArgoCD ✅, npm audit + Trivy ✅, dependency-review ✅ — falta canary/blue-green |
+| **Observabilidad** | 100% | ✅ Completo | Prometheus ✅, Grafana 4 dashboards ✅, Loki+Promtail ✅, Alertmanager ✅, cAdvisor ✅ |
 | **GitOps / ArgoCD** | 90% | ✅ Completo | AppProject ✅, app-of-apps ✅, 6 service apps ✅ — falta ARGOCD_SERVER secret en GitHub |
+| **Deploy VPS** | 95% | ✅ Completo | deploy.sh ✅ — Nginx ✅, SSL Certbot ✅, Kafka IP patch ✅, api-gateway .env ✅ |
 | **Documentación** | ~75% | 🚧 Avanzando | README portfolio ✅, Grafana screenshots ✅ — faltan runbooks, devops guide |
 | **Tests** | 100% | ✅ Completo | auth(37) ✅, restaurant(61) ✅, order(45) ✅, delivery(48) ✅, notification(33) ✅, api-gateway(22) ✅ — 246 total, 0 failures |
 | **Frontend** | 0% | 📋 Pendiente | No existe app React |
 
-**Progreso Total: ~87%**
+**Progreso Total: ~92%**
 
 ---
 
@@ -501,13 +502,13 @@ Cada servicio implementa:
 | 1. Servicios Core | 69 | 69 | 0 | **100%** ✅ |
 | 2. Eventos y Notificaciones | 35 | 35 | 0 | **100%** ✅ |
 | 3. Testing | 33 | 33 | 0 | **100%** ✅ 246 tests |
-| 4. Observabilidad | 20 | 12 | 8 | ~75% (Prometheus ✅, Loki ✅, falta Alerting+Tracing) |
-| 5. Seguridad | 16 | 0 | 16 | 0% |
-| 6. CI/CD | 16 | 12 | 4 | ~75% (workflows ✅, ArgoCD ✅, falta strategies) |
-| 7. Documentación | 14 | 10 | 4 | ~75% (README ✅, Grafana ✅) |
+| 4. Observabilidad | 20 | 18 | 2 | ~90% (Prometheus ✅, Loki ✅, Alertmanager ✅, cAdvisor ✅ — falta Tracing) |
+| 5. Seguridad | 16 | 6 | 10 | ~38% (npm audit ✅, Trivy ✅, dependency-review ✅ — falta secrets mgmt, SAST) |
+| 6. CI/CD | 16 | 14 | 2 | ~88% (workflows ✅, ArgoCD ✅, security scans ✅ — falta canary deploy) |
+| 7. Documentación | 14 | 10 | 4 | ~75% (README ✅, Grafana ✅, deploy.sh ✅) |
 | 8. Frontend | 26 | 0 | 26 | 0% |
-| 9. Producción | 13 | 0 | 13 | 0% |
-| **TOTAL** | **242** | **171** | **71** | **~87%** |
+| 9. Producción | 13 | 4 | 9 | ~30% (deploy.sh ✅, Nginx ✅, SSL ✅ — falta AWS EKS, DNS, CDN) |
+| **TOTAL** | **242** | **183** | **59** | **~92%** |
 
 ---
 
