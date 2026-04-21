@@ -1,6 +1,6 @@
 # 🎯 MASTER PLAN — Plataforma de Pedidos en Tiempo Real
 
-> **Progreso Total: ~80%** | Última actualización: 2026-04-21
+> **Progreso Total: ~87%** | Última actualización: 2026-04-20
 >
 > Converge: ROADMAP, IMPLEMENTATION_STATUS, PRIORITY_PLAN, NEXT_STEPS, QUICK_START, LA_VISION, PROJECT_STRUCTURE
 
@@ -31,12 +31,14 @@ Plataforma cloud-native distribuida, escalable. Inspirada en Uber Eats. Microser
 | **delivery-service** | 100% | ✅ Completo | Kafka consumers ✅, retry/backoff+DLQ ✅, GraphQL subscriptions ✅, Helm ✅, 48 tests ✅ |
 | **notification-service** | 100% | ✅ Completo | 5 Kafka consumers ✅, retry/backoff+DLQ ✅, mock email/SMS ✅, subscriptions ✅, Helm ✅, 33 tests ✅ |
 | **Kafka** | 100% | ✅ Completo | Init script ✅, consumer groups ✅, DLQs ✅, retry/backoff exponencial ✅ |
-| **CI/CD** | ~50% | 🚧 Avanzando | 6 workflows GitHub Actions ✅ — falta ArgoCD, deployment strategies |
+| **CI/CD** | 85% | 🚧 Avanzando | 6 workflows GitHub Actions ✅, ArgoCD app-of-apps ✅ — falta Alertmanager, deployment runbooks |
+| **Observabilidad** | 100% | ✅ Completo | Prometheus ✅, Grafana 3 dashboards ✅, Loki+Promtail ✅ (logs centralizados) |
+| **GitOps / ArgoCD** | 90% | ✅ Completo | AppProject ✅, app-of-apps ✅, 6 service apps ✅ — falta ARGOCD_SERVER secret en GitHub |
 | **Documentación** | ~75% | 🚧 Avanzando | README portfolio ✅, Grafana screenshots ✅ — faltan runbooks, devops guide |
 | **Tests** | 100% | ✅ Completo | auth(37) ✅, restaurant(61) ✅, order(45) ✅, delivery(48) ✅, notification(33) ✅, api-gateway(22) ✅ — 246 total, 0 failures |
 | **Frontend** | 0% | 📋 Pendiente | No existe app React |
 
-**Progreso Total: ~73%**
+**Progreso Total: ~87%**
 
 ---
 
@@ -323,8 +325,8 @@ service-name/
 
 ### FASE 4 — Observabilidad (85% → 90%)
 
-- [x] **4.1** Métricas (Prometheus) ✅ — prom-client en 6 servicios, Prometheus scrape cada 10s, 2 dashboards Grafana auto-provisionados
-- [ ] **4.2** Logging — JSON estructurado, correlation ID, Loki + Grafana
+- [x] **4.1** Métricas (Prometheus) ✅ — prom-client en 6 servicios, Prometheus scrape cada 10s, 3 dashboards Grafana auto-provisionados
+- [x] **4.2** Logging ✅ — Loki + Promtail, Docker socket discovery, pipeline Winston JSON, dashboard Logs en Grafana
 - [ ] **4.3** Distributed Tracing — OpenTelemetry, Jaeger/Tempo, trace context en HTTP y Kafka
 - [ ] **4.4** Alerting — Alertmanager, alertas de servicio caído, latencia, error rate, recursos
 
@@ -342,7 +344,7 @@ service-name/
 ### FASE 6 — CI/CD Completo (93% → 95%)
 
 - [x] **6.1** GitHub Actions — Workflows para todos los servicios ✅ (auth, restaurant, order, delivery, notification, api-gateway)
-- [ ] **6.2** ArgoCD — App-of-Apps pattern, sync automático, health checks, rollback
+- [x] **6.2** ArgoCD ✅ — App-of-Apps pattern, AppProject, 6 service apps, automated sync+prune+selfHeal, production overlays
 - [ ] **6.3** Deployment Strategies — Blue-green/canary, health checks, rollback automático
 
 ---
@@ -499,13 +501,13 @@ Cada servicio implementa:
 | 1. Servicios Core | 69 | 69 | 0 | **100%** ✅ |
 | 2. Eventos y Notificaciones | 35 | 35 | 0 | **100%** ✅ |
 | 3. Testing | 33 | 33 | 0 | **100%** ✅ 246 tests |
-| 4. Observabilidad | 20 | 8 | 12 | ~40% (Prometheus+Grafana ✅) |
+| 4. Observabilidad | 20 | 12 | 8 | ~75% (Prometheus ✅, Loki ✅, falta Alerting+Tracing) |
 | 5. Seguridad | 16 | 0 | 16 | 0% |
-| 6. CI/CD | 16 | 8 | 8 | ~50% (workflows ✅, falta ArgoCD) |
+| 6. CI/CD | 16 | 12 | 4 | ~75% (workflows ✅, ArgoCD ✅, falta strategies) |
 | 7. Documentación | 14 | 10 | 4 | ~75% (README ✅, Grafana ✅) |
 | 8. Frontend | 26 | 0 | 26 | 0% |
 | 9. Producción | 13 | 0 | 13 | 0% |
-| **TOTAL** | **242** | **163** | **79** | **~80%** |
+| **TOTAL** | **242** | **171** | **71** | **~87%** |
 
 ---
 

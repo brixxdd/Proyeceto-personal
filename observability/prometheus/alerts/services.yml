@@ -1,0 +1,113 @@
+groups:
+  - name: service_availability
+    interval: 30s
+    rules:
+      # ── ServiceDown ──────────────────────────────────────────────────────────
+      # Fires when Prometheus cannot scrape a target for more than 1 minute.
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: >
+            Prometheus target {{ $labels.job }} ({{ $labels.instance }}) has been
+            unreachable for more than 1 minute. The service may have crashed or
+            the network path to it is broken.
+
+  - name: http_errors
+    rules:
+      # ── HighErrorRate ─────────────────────────────────────────────────────────
+      # Fires when 5xx responses exceed 5 % of total requests over the last 2 min.
+      # Uses the histogram metric exposed by prom-client's http_request_duration_seconds.
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum by (job) (
+              rate(http_request_duration_seconds_count{status_code=~"5.."}[2m])
+            )
+            /
+            sum by (job) (
+              rate(http_request_duration_seconds_count[2m])
+            )
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP error rate on {{ $labels.job }}"
+          description: >
+            {{ $labels.job }} has a 5xx error rate of
+            {{ $value | humanizePercentage }} over the last 2 minutes
+            (threshold: 5 %).
+
+  - name: http_latency
+    rules:
+      # ── HighLatency ───────────────────────────────────────────────────────────
+      # Fires when the p99 request latency exceeds 2 s for more than 5 minutes.
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (job, le) (
+              rate(http_request_duration_seconds_bucket[5m])
+            )
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p99 latency on {{ $labels.job }}"
+          description: >
+            {{ $labels.job }} p99 request latency is
+            {{ $value | humanizeDuration }} (threshold: 2 s) over the last 5 minutes.
+
+  - name: kafka_consumers
+    rules:
+      # ── KafkaConsumerLag ──────────────────────────────────────────────────────
+      # Fires when the Kafka consumer lag exceeds 1000 messages.
+      # kafka_consumergroup_lag is exposed by kafka-exporter; this rule is a
+      # no-op if the metric is not present in your scrape targets.
+      - alert: KafkaConsumerLag
+        expr: kafka_consumergroup_lag > 1000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka consumer lag is high ({{ $labels.consumergroup }} / {{ $labels.topic }})"
+          description: >
+            Consumer group {{ $labels.consumergroup }} is {{ $value }} messages behind
+            on topic {{ $labels.topic }}. The delivery-service or notification-service
+            may be struggling to keep up with the order event stream.
+
+  - name: node_resources
+    rules:
+      # ── HighMemoryUsage ───────────────────────────────────────────────────────
+      # Fires when a Node.js process RSS exceeds 500 MB for more than 5 minutes.
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes > 500 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.job }}"
+          description: >
+            {{ $labels.job }} is using {{ $value | humanize1024 }}B of resident memory
+            (threshold: 500 MiB). Check for memory leaks or connection pool exhaustion.
+
+      # ── EventLoopLag ──────────────────────────────────────────────────────────
+      # Fires when the Node.js event-loop lag exceeds 100 ms for more than 2 minutes.
+      # prom-client exposes nodejs_eventloop_lag_seconds when collectDefaultMetrics()
+      # is called (which all six services do via their metrics/ module).
+      - alert: EventLoopLag
+        expr: nodejs_eventloop_lag_seconds > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Event-loop lag detected on {{ $labels.job }}"
+          description: >
+            {{ $labels.job }} event-loop lag is {{ $value | humanizeDuration }}
+            (threshold: 100 ms). The process may be CPU-bound or blocked by
+            synchronous I/O.

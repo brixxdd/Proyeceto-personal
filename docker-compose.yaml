@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL - Auth Service
   postgres-auth:
@@ -300,11 +298,27 @@ services:
 
   # ── Observability ──────────────────────────────────────────────────────────
 
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: food-delivery-alertmanager
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - "9094:9093"
+    restart: unless-stopped
+    networks:
+      - food-delivery-network
+
   prometheus:
     image: prom/prometheus:v2.51.0
     container_name: food-delivery-prometheus
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alerts:/etc/prometheus/alerts:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -388,6 +402,7 @@ volumes:
   postgres_notification_data:
   redis_data:
   prometheus_data:
+  alertmanager_data:
   grafana_data:
   loki_data:
 
