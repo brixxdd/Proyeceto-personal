@@ -12,6 +12,7 @@ RUN npm ci && npm cache clean --force
 
 # Copiar código fuente y schema
 COPY src/ ./src/
+COPY migrations/ ./migrations/
 COPY schema.graphql ./schema.graphql
 
 # Compilar TypeScript
@@ -31,6 +32,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nodejs:nodejs /app/schema.graphql ./schema.graphql
+COPY --from=builder --chown=nodejs:nodejs /app/migrations ./migrations
 
 # Cambiar a usuario no-root
 USER nodejs

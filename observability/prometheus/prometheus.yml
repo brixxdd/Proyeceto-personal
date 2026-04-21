@@ -1,0 +1,47 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: 'local'
+    project: 'food-delivery-platform'
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'restaurant-service'
+    static_configs:
+      - targets: ['restaurant-service:3001']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:3002']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'delivery-service'
+    static_configs:
+      - targets: ['delivery-service:3003']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:3004']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:4000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s

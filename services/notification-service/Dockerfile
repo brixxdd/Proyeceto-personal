@@ -8,6 +8,7 @@ COPY tsconfig.json ./
 RUN npm ci && npm cache clean --force
 
 COPY src/ ./src/
+COPY migrations/ ./migrations/
 COPY src/schema.graphql ./src/schema.graphql
 
 RUN npx tsc
@@ -22,6 +23,8 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nodejs:nodejs /app/src/schema.graphql ./dist/schema.graphql
+COPY --from=builder --chown=nodejs:nodejs /app/migrations ./migrations
 
 USER nodejs
 

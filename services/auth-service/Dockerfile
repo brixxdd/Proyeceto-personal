@@ -9,6 +9,7 @@ COPY tsconfig.json ./
 RUN npm ci && npm cache clean --force
 
 COPY src/ ./src/
+COPY migrations/ ./migrations/
 
 RUN npx tsc
 

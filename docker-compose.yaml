@@ -298,6 +298,47 @@ services:
     networks:
       - food-delivery-network
 
+  # ── Observability ──────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: food-delivery-prometheus
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    networks:
+      - food-delivery-network
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: food-delivery-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/food-delivery-overview.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3010:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - food-delivery-network
+
   # Kafka topic initialiser (one-shot job)
   kafka-init:
     image: confluentinc/cp-kafka:7.5.0
@@ -320,6 +361,8 @@ volumes:
   postgres_delivery_data:
   postgres_notification_data:
   redis_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   food-delivery-network:

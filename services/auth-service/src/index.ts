@@ -9,11 +9,15 @@ import http from 'http';
 import { Pool } from 'pg';
 import { createClient } from 'redis';
 import { parse } from 'graphql';
+import { collectDefaultMetrics, Registry } from 'prom-client';
 import { logger } from './utils/logger';
 import { typeDefs } from './schema';
 import { resolvers, initializeResolvers } from './resolvers';
 import { getAuthContext, AuthContext } from './middleware/auth';
 import { initializeRedis } from './services/redis.service';
+
+const metricsRegistry = new Registry();
+collectDefaultMetrics({ register: metricsRegistry });
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -39,6 +43,16 @@ redisClient.on('connect', () => logger.info('Redis connected'));
     logger.warn('Failed to connect to Redis, continuing without it', { error: (error as Error).message });
   }
 })();
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (_req, res) => {
+  try {
+    res.set('Content-Type', metricsRegistry.contentType);
+    res.end(await metricsRegistry.metrics());
+  } catch (err) {
+    res.status(500).end(err);
+  }
+});
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

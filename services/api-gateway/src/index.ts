@@ -9,8 +9,12 @@ import { createClient as createRedisClient } from 'redis';
 import rateLimit from 'express-rate-limit';
 import { WebSocketServer } from 'ws';
 import WebSocket from 'ws';
+import { collectDefaultMetrics, Registry } from 'prom-client';
 import { logger } from './utils/logger';
 import { getContextFromRequest } from './middleware/auth';
+
+const metricsRegistry = new Registry();
+collectDefaultMetrics({ register: metricsRegistry });
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -75,6 +79,16 @@ const gateway = new ApolloGateway({
       },
     });
   },
+});
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (_req, res) => {
+  try {
+    res.set('Content-Type', metricsRegistry.contentType);
+    res.end(await metricsRegistry.metrics());
+  } catch (err) {
+    res.status(500).end(err);
+  }
 });
 
 // Health check endpoint - checks all 3 subgraphs
