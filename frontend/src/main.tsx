@@ -8,13 +8,11 @@ import App from './App.tsx'
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ApolloProvider client={apolloClient}>
-      <BrowserRouter>
-        <ThemeProvider>
-          <App />
-        </ThemeProvider>
-      </BrowserRouter>
-    </ApolloProvider>
-  </StrictMode>,
+  <ApolloProvider client={apolloClient}>
+    <BrowserRouter>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </BrowserRouter>
+  </ApolloProvider>
 )

@@ -17,7 +17,7 @@ export default function App() {
     <div className="min-h-dvh flex flex-col" style={{ backgroundColor: 'var(--color-background)' }}>
       <Navbar />
       <div className="flex-1 pb-20 md:pb-0">
-        <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />

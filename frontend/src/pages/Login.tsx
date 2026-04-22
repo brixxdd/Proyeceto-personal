@@ -34,7 +34,8 @@ export default function Login() {
       <div className="min-h-[calc(100dvh-64px)] md:min-h-[calc(100vh-64px)] flex items-center justify-center p-6">
         <div className="w-full max-w-[400px]">
           <motion.div
-            className="bg-white p-8 md:p-10 rounded-[32px] border border-[var(--color-border)] ios-shadow-lg"
+            className="p-8 md:p-10 rounded-[32px] border border-[var(--color-border)] ios-shadow-lg"
+            style={{ backgroundColor: 'var(--color-card)' }}
             variants={staggerContainer}
             initial="initial"
             animate="animate"
@@ -85,7 +86,7 @@ export default function Login() {
                   inputMode="email"
                   value={form.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  className="px-4 py-3.5 rounded-[16px] text-[15px] transition-colors border border-[var(--color-border)] bg-[var(--color-muted)] focus:bg-white w-full"
+                  className="px-4 py-3.5 rounded-[16px] text-[15px] transition-colors border border-[var(--color-border)] bg-[var(--color-muted)] w-full focus:bg-[var(--color-card)]"
                   placeholder="tu@email.com"
                 />
               </motion.div>
@@ -100,7 +101,7 @@ export default function Login() {
                     autoComplete="current-password"
                     value={form.password}
                     onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                    className="w-full px-4 py-3.5 pr-12 rounded-[16px] text-[15px] transition-colors border border-[var(--color-border)] bg-[var(--color-muted)] focus:bg-white"
+                    className="w-full px-4 py-3.5 pr-12 rounded-[16px] text-[15px] transition-colors border border-[var(--color-border)] bg-[var(--color-muted)] focus:bg-[var(--color-card)]"
                     placeholder="••••••••"
                   />
                   <button

@@ -22,7 +22,7 @@ export default function Navbar() {
       initial={{ y: -64, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className="sticky top-0 z-50 glass-card dark:glass-card-dark"
+      className="sticky top-0 z-50 glass-card"
       style={{ 
         borderBottom: '1px solid var(--color-border)',
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4px)'
