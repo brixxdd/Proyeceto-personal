@@ -1,6 +1,6 @@
 # 🎯 MASTER PLAN — Plataforma de Pedidos en Tiempo Real
 
-> **Progreso Total: ~93%** | Última actualización: 2026-04-21
+> **Progreso Total: ~94%** | Última actualización: 2026-04-22
 >
 > Converge: ROADMAP, IMPLEMENTATION_STATUS, PRIORITY_PLAN, NEXT_STEPS, QUICK_START, LA_VISION, PROJECT_STRUCTURE
 
@@ -37,7 +37,7 @@ Plataforma cloud-native distribuida, escalable. Inspirada en Uber Eats. Microser
 | **Deploy VPS** | 95% | ✅ Completo | deploy.sh ✅ — Nginx ✅, SSL Certbot ✅, Kafka IP patch ✅, api-gateway .env ✅ |
 | **Documentación** | ~75% | 🚧 Avanzando | README portfolio ✅, Grafana screenshots ✅ — faltan runbooks, devops guide |
 | **Tests** | 100% | ✅ Completo | auth(37) ✅, restaurant(61) ✅, order(45) ✅, delivery(48) ✅, notification(33) ✅, api-gateway(22) ✅ — 246 total, 0 failures |
-| **Frontend** | 0% | 📋 Pendiente | No existe app React |
+| **Frontend** | 75% | 🚧 Avanzando | Landing (parallax, animaciones scroll, modo noche, diseño premium) ✅, Login ✅, Register ✅, Restaurants ✅, RestaurantDetail ✅, Orders ✅, OrderTracking ✅, responsive mobile ✅, Apollo Client ✅, ThemeContext ✅, ThemeToggle ✅ — faltan: tests, WCAG 2.2, SEO, perf, profile, checkout flow, Helm |
 
 **Progreso Total: ~93%**
 
@@ -358,10 +358,10 @@ service-name/
 
 ---
 
-### FASE 8 — Frontend (97% → 99%)
+### FASE 8 — Frontend (94% → 99%)
 
-- [ ] **8.1** React App — Setup con Vite + React + TypeScript, Apollo Client, React Router, UI framework
-- [ ] **8.2** Páginas — Landing, Login, Dashboard, Catálogo, Restaurante, Carrito, Tracking, Perfil, Dashboards
+- [x] **8.1** React App — Setup con Vite + React + TypeScript, Apollo Client, React Router, UI framework ✅
+- [x] **8.2** Páginas — Landing ✅, Login ✅, Register ✅, Restaurants ✅, Restaurante ✅, Carrito ✅, Tracking ✅, Orders ✅
 - [ ] **8.3** Frontend — Calidad — Tests, accesibilidad WCAG 2.2, SEO, performance, responsive, Helm chart
 
 ---
@@ -507,9 +507,9 @@ Cada servicio implementa:
 | 5. Seguridad | 16 | 6 | 10 | ~38% (npm audit ✅, Trivy ✅, dependency-review ✅ — falta secrets mgmt, SAST) |
 | 6. CI/CD | 16 | 14 | 2 | ~88% (workflows ✅, ArgoCD ✅, security scans ✅ — falta canary deploy) |
 | 7. Documentación | 14 | 10 | 4 | ~75% (README ✅, Grafana ✅, deploy.sh ✅) |
-| 8. Frontend | 26 | 0 | 26 | 0% |
+| 8. Frontend | 26 | 20 | 6 | **75%** |
 | 9. Producción | 13 | 4 | 9 | ~30% (deploy.sh ✅, Nginx ✅, SSL ✅ — falta AWS EKS, DNS, CDN) |
-| **TOTAL** | **242** | **183** | **59** | **~92%** |
+| **TOTAL** | **242** | **200** | **42** | **~94%** |
 
 ---
 

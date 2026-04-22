@@ -1,0 +1,41 @@
+ADMINER CONNECTIONS — Food Delivery Platform
+============================================
+URL: http://localhost:8080
+Sistema: PostgreSQL
+Usuario: postgres
+Password: postgres
+
+----------------------------------------------
+1. AUTH SERVICE
+   Servidor:  food-delivery-postgres-auth
+   Base de datos: auth_db
+   Puerto externo (fuera de Docker): localhost:5433
+
+----------------------------------------------
+2. RESTAURANT SERVICE
+   Servidor:  food-delivery-postgres-restaurant
+   Base de datos: restaurant_db
+   Puerto externo (fuera de Docker): localhost:5434
+
+----------------------------------------------
+3. ORDER SERVICE
+   Servidor:  food-delivery-postgres-order
+   Base de datos: order_db
+   Puerto externo (fuera de Docker): localhost:5435
+
+----------------------------------------------
+4. DELIVERY SERVICE
+   Servidor:  food-delivery-postgres-delivery
+   Base de datos: delivery_db
+   Puerto externo (fuera de Docker): localhost:5436
+
+----------------------------------------------
+5. NOTIFICATION SERVICE
+   Servidor:  food-delivery-postgres-notification
+   Base de datos: notification_db
+   Puerto externo (fuera de Docker): localhost:5437
+
+----------------------------------------------
+NOTA: En Adminer usa el nombre del container como Servidor
+(no localhost). Los puertos externos son para conectarte
+desde DBeaver, TablePlus, psql, etc.

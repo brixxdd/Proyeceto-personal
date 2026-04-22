@@ -23,9 +23,9 @@ export default function BottomNav() {
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-16"
       style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.92)',
-        backdropFilter: 'saturate(180%) blur(20px)',
-        WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        backdropFilter: 'blur(40px) saturate(200%)',
+        WebkitBackdropFilter: 'blur(40px) saturate(200%)',
         borderTop: '1px solid var(--color-border)',
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
       }}
@@ -38,14 +38,25 @@ export default function BottomNav() {
             to={to}
             className="flex flex-col items-center justify-center gap-[2px] w-16 h-12"
           >
-            <div className="relative flex items-center justify-center">
+            <motion.div
+              className="relative flex items-center justify-center"
+              animate={active ? { scale: [1, 1.15, 1] } : {}}
+              transition={{ duration: 0.3 }}
+            >
               <Icon
                 size={22}
                 className="relative z-10 transition-colors"
                 style={{ color: active ? 'var(--color-primary)' : 'var(--color-muted-foreground)' }}
                 strokeWidth={active ? 2.5 : 2}
               />
-            </div>
+              {active && (
+                <motion.div
+                  layoutId="bottomNavDot"
+                  className="absolute -bottom-1 w-1 h-1 rounded-full"
+                  style={{ backgroundColor: 'var(--color-primary)' }}
+                />
+              )}
+            </motion.div>
             <span
               className="text-[10px] font-medium transition-colors"
               style={{ color: active ? 'var(--color-primary)' : 'var(--color-muted-foreground)' }}
