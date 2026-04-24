@@ -92,9 +92,14 @@ export default function RestaurantDetail() {
 
   async function handleOrder() {
     if (!localStorage.getItem('token')) { navigate('/login'); return }
-    const items = Object.entries(cart).map(([menuItemId, quantity]) => ({ menuItemId, quantity }))
-    const result = await createOrder({ variables: { input: { restaurantId: id, items, deliveryAddress: DEFAULT_ADDRESS } } })
-    navigate(`/orders/${(result.data as any).createOrder.id}`)
+    try {
+      const items = Object.entries(cart).map(([menuItemId, quantity]) => ({ menuItemId, quantity }))
+      const result = await createOrder({ variables: { input: { restaurantId: id, items, deliveryAddress: DEFAULT_ADDRESS } } })
+      navigate(`/orders/${(result.data as any).createOrder.id}`)
+    } catch (err: any) {
+      console.error(err)
+      alert(err.message || 'Error al procesar el pedido')
+    }
   }
 
   if (loading) return (

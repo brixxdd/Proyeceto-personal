@@ -28,6 +28,8 @@ COPY --from=builder --chown=nodejs:nodejs /app/migrations ./migrations
 
 USER nodejs
 
+ENV JWT_SECRET=e4b51c89f212267b2d56a3e264024b898f98a280
+
 EXPOSE 3004
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \

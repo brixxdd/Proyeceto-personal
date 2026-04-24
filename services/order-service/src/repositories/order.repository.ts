@@ -120,6 +120,38 @@ export class OrderRepository {
     return result.rows.map(row => this.mapRowToOrder(row, row.items || []));
   }
 
+  async findAllOrders(status?: OrderStatus, limit = 20, offset = 0): Promise<Order[]> {
+    let query = `
+      SELECT o.*, 
+             json_agg(
+               json_build_object(
+                 'id', oi.id,
+                 'menuItemId', oi.menu_item_id,
+                 'quantity', oi.quantity,
+                 'price', oi.price,
+                 'subtotal', oi.subtotal
+               )
+             ) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+    `;
+    
+    const params: any[] = [];
+    
+    if (status) {
+      query += ` WHERE o.status = $1`;
+      params.push(status);
+      query += ` GROUP BY o.id ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(limit, offset);
+    } else {
+      query += ` GROUP BY o.id ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`;
+      params.push(limit, offset);
+    }
+
+    const result = await this.pool.query(query, params);
+    return result.rows.map(row => this.mapRowToOrder(row, row.items || []));
+  }
+
   async updateStatus(id: string, status: OrderStatus, deliveryPersonId?: string): Promise<Order | null> {
     const updates: string[] = ['status = $2'];
     const values: any[] = [id, status];

@@ -24,9 +24,13 @@ export default function Login() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const { data } = await login({ variables: form })
-    localStorage.setItem('token', (data as any).login.token)
-    navigate('/restaurants')
+    try {
+      const { data } = await login({ variables: form })
+      if (data?.login?.token) {
+        localStorage.setItem('token', data.login.token)
+        navigate('/restaurants')
+      }
+    } catch { /* error state handled by Apollo */ }
   }
 
   return (

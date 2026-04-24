@@ -32,9 +32,9 @@ const { Pool } = pg;
 // Connection strings
 // ---------------------------------------------------------------------------
 const AUTH_DB_URL =
-  process.env.AUTH_DB_URL || 'postgresql://postgres:postgres@localhost:5432/auth_db';
+  process.env.AUTH_DB_URL || 'postgresql://postgres:postgres@localhost:5433/auth_db';
 const RESTAURANT_DB_URL =
-  process.env.RESTAURANT_DB_URL || 'postgresql://postgres:postgres@localhost:5432/restaurant_db';
+  process.env.RESTAURANT_DB_URL || 'postgresql://postgres:postgres@localhost:5434/restaurant_db';
 
 // ---------------------------------------------------------------------------
 // Hardcoded UUIDs — keep stable so the script stays idempotent

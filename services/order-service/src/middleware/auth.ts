@@ -46,7 +46,20 @@ export function verifyToken(token: string): JwtPayload | null {
  * @param authHeader - Header Authorization completo
  * @returns AuthContext con información del usuario o no autenticado
  */
-export function extractAuthContext(authHeader: string | undefined): AuthContext {
+export function extractAuthContext(authHeader: string | undefined, xUserId?: string, xUserEmail?: string, xUserRole?: string): AuthContext {
+  // Primero intentamos leer los headers que envía el api-gateway
+  if (xUserId && xUserRole) {
+    return {
+      isAuthenticated: true,
+      user: {
+        userId: xUserId,
+        email: xUserEmail || '',
+        role: xUserRole,
+      }
+    };
+  }
+
+  // Fallback a leer el header de Authorization directamente
   if (!authHeader) {
     return { isAuthenticated: false };
   }

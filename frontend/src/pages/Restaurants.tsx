@@ -84,7 +84,7 @@ export default function Restaurants() {
   if (error) return (
     <PageTransition>
       <div className="max-w-6xl mx-auto px-6 py-12 text-center text-[var(--color-destructive)] font-medium">
-        Error al cargar restaurantes: {error.message}
+        Error al cargar restaurantes
       </div>
     </PageTransition>
   )

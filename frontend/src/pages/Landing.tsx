@@ -137,10 +137,9 @@ function AnimatedBackground() {
       />
       
       <motion.div 
-        className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full"
+        className="absolute top-1/4 left-1/4 w-[600px] h-[600px] rounded-full pointer-events-none"
         style={{ 
-          background: 'radial-gradient(circle, rgba(255,59,48,0.15) 0%, transparent 70%)',
-          filter: 'blur(60px)',
+          background: 'radial-gradient(circle, rgba(255,59,48,0.08) 0%, rgba(255,59,48,0.03) 40%, transparent 70%)',
         }}
         animate={{ 
           scale: [1, 1.2, 1],
@@ -151,10 +150,9 @@ function AnimatedBackground() {
       />
       
       <motion.div 
-        className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full"
+        className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full pointer-events-none"
         style={{ 
-          background: 'radial-gradient(circle, rgba(255,149,0,0.12) 0%, transparent 70%)',
-          filter: 'blur(50px)',
+          background: 'radial-gradient(circle, rgba(255,149,0,0.06) 0%, rgba(255,149,0,0.02) 40%, transparent 70%)',
         }}
         animate={{ 
           scale: [1, 1.3, 1],
@@ -165,10 +163,9 @@ function AnimatedBackground() {
       />
 
       <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] rounded-full pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, rgba(0,122,255,0.08) 0%, transparent 60%)',
-          filter: 'blur(80px)',
+          background: 'radial-gradient(circle, rgba(0,122,255,0.04) 0%, rgba(0,122,255,0.01) 40%, transparent 70%)',
         }}
         animate={{
           scale: [1, 1.1, 1],

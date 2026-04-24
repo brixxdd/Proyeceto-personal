@@ -19,6 +19,17 @@ export class OrderResolver {
   ): Promise<Order[]> {
     const user = requireAuth(context.auth);
 
+    // Si es ADMIN, obtenemos todos los pedidos sin filtrar por customerId
+    if (user.role === 'ADMIN') {
+      return this.orderService.getOrders(
+        '', // customerId vacío para indicar que es admin
+        args.status,
+        args.limit || 20,
+        args.offset || 0,
+        true // is admin flag
+      );
+    }
+
     return this.orderService.getOrders(
       user.userId,
       args.status,
@@ -37,7 +48,7 @@ export class OrderResolver {
     const order = await this.orderService.getOrderById(args.id);
 
     // Verify order belongs to user (or user is admin/restaurant owner)
-    if (order && order.customerId !== user.userId) {
+    if (order && order.customerId !== user.userId && user.role !== 'ADMIN') {
       throw new Error('Forbidden');
     }
 

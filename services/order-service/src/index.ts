@@ -211,7 +211,12 @@ async function startServer() {
       express.json(),
       expressMiddleware(server, {
         context: async ({ req }) => {
-          const auth = extractAuthContext(req.headers.authorization);
+          const auth = extractAuthContext(
+            req.headers.authorization,
+            req.headers['x-user-id'] as string | undefined,
+            req.headers['x-user-email'] as string | undefined,
+            req.headers['x-user-role'] as string | undefined
+          );
           return { auth, user: auth.user ?? null, pubSub };
         },
       }),

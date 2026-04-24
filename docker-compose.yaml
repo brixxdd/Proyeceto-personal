@@ -167,6 +167,8 @@ services:
       KAFKA_BROKERS: kafka:29092
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       SERVICE_NAME: order-service
+      JWT_SECRET: e4b51c89f212267b2d56a3e264024b898f98a280
+      RESTAURANT_SERVICE_URL: http://restaurant-service:3001
     ports:
       - "3000:3000"
     depends_on:
@@ -213,9 +215,9 @@ services:
       PORT: 3002
       DATABASE_URL: postgresql://postgres:postgres@postgres-auth:5432/auth_db
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: your-secret-key-change-in-production
+      JWT_SECRET: e4b51c89f212267b2d56a3e264024b898f98a280
       JWT_EXPIRES_IN: 1h
-      JWT_REFRESH_SECRET: your-refresh-key-change-in-production
+      JWT_REFRESH_SECRET: 8b5d3a2e7c4146a81d11b33948e65a0b943d6342
       JWT_REFRESH_EXPIRES_IN: 7d
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       SERVICE_NAME: auth-service
@@ -240,7 +242,7 @@ services:
       RESTAURANT_SERVICE_URL: http://restaurant-service:3001/graphql
       ORDER_SERVICE_URL: http://order-service:3000/graphql
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: your-secret-key-change-in-production
+      JWT_SECRET: e4b51c89f212267b2d56a3e264024b898f98a280
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       SERVICE_NAME: api-gateway
     ports:

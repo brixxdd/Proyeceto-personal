@@ -74,7 +74,10 @@ export class OrderService {
     return order;
   }
 
-  async getOrders(customerId: string, status?: OrderStatus, limit = 20, offset = 0): Promise<Order[]> {
+  async getOrders(customerId: string, status?: OrderStatus, limit = 20, offset = 0, isAdmin = false): Promise<Order[]> {
+    if (isAdmin) {
+      return this.orderRepository.findAllOrders(status, limit, offset);
+    }
     return this.orderRepository.findByCustomerId(customerId, status, limit, offset);
   }
 
