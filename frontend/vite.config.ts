@@ -11,6 +11,7 @@ export default defineConfig({
       '/graphql': {
         target: 'http://localhost:4000',
         changeOrigin: true,
+        ws: true, // Enable WebSocket proxy for subscriptions
       },
     },
   },

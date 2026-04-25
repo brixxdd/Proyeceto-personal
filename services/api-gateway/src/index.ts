@@ -21,7 +21,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const httpServer = createServer(app);
 const ORDER_SERVICE_WS_URL =
-  process.env.ORDER_SERVICE_WS_URL || 'ws://localhost:3000/graphql';
+  process.env.ORDER_SERVICE_WS_URL || 'ws://order-service:3000/graphql';
 
 // Redis client for rate limiting
 let redisClient: any = null;
@@ -202,11 +202,14 @@ async function startServer() {
       if (upstream.readyState < WebSocket.CLOSING) upstream.close(code, reason);
     });
     upstream.on('close', (code, reason) => {
+      logger.warn('WS upstream closed', { code, reason: reason?.toString() });
       if (downstream.readyState < WebSocket.CLOSING) downstream.close(code, reason);
     });
 
     downstream.on('error', (err) => logger.error('WS downstream error', err));
-    upstream.on('error', (err) => logger.error('WS upstream error', err));
+    upstream.on('error', (err) => {
+      logger.error('WS upstream error', { error: err.message, code: (err as any).code });
+    });
   });
 
   logger.info(`WebSocket subscription proxy ready — upstream: ${ORDER_SERVICE_WS_URL}`);
