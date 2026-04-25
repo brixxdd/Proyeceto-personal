@@ -33,6 +33,7 @@ Plataforma cloud-native de pedidos de comida en tiempo real. Inspirada en **Uber
 
 | Feature | Descripción |
 |----------|-------------|
+| **Real-time Order Tracking** | Actualización automática sin recargar — GraphQL subscriptions via WebSocket + Redis PubSub. El cliente ve los cambios de estado en tiempo real mientras el owner los realiza. |
 | **Restaurant Owner Dashboard** | Dashboard exclusivo donde el owner ve los pedidos de su restaurante, cambia estados (Confirmar → Preparando → Listo), con verificación de ownership. |
 | **Modelo 1:1 Usuario-Restaurante** | Cada `RESTAURANT_OWNER` tiene exactamente un restaurante. Sin selectores ambiguos. |
 | **Menu Item Names en Dashboard** | Los pedidos muestran nombres reales de productos (batch fetch via `menuItems(ids)` query). |
@@ -204,7 +205,8 @@ USERS (auth_db)                         RESTAURANTS (restaurant_db)
 
 ### Tiempo Real
 - **GraphQL Subscriptions** respaldadas por Redis pub/sub — escala horizontalmente entre réplicas del servicio.
-- **WebSocket proxy** en api-gateway reenvía tráfico de subscriptions a order-service sin terminar la conexión.
+- **WebSocket proxy** en api-gateway reenvía tráfico de subscriptions a order-service preservando el flag `isBinary` (texto vs binario). Sin este fix, `graphql-ws` recibía mensajes corruptos.
+- **OrderTracking en tiempo real** — `useState` + `onData` callback actualiza React state directamente desde la subscription, sin pasar por Apollo cache.
 
 ### Seguridad
 - **JWT + refresh token rotation** con blacklist en Redis para invalidación instantánea al logout.
@@ -355,7 +357,7 @@ done
 | 5. Seguridad | 🚧 ~56% | JWT ✅, blacklist ✅, sessionStorage ✅ |
 | 6. CI/CD | 🚧 ~88% | GitHub Actions ✅, ArgoCD ✅ |
 | 7. Documentación | 🚧 ~79% | README ✅, falta runbooks |
-| 8. Frontend | 🚧 99% | Dashboard owner ✅, falta useAuth hook |
+| 8. Frontend | 🚧 99% | Dashboard owner ✅ · Real-time subscription ✅ · falta useAuth hook |
 | 9. Producción | 🚧 ~38% | Deploy script ✅, falta AWS EKS |
 | **Total** | **~96%** | |
 

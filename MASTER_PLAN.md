@@ -27,7 +27,7 @@ Plataforma cloud-native distribuida, escalable. Inspirada en Uber Eats. Microser
 | **order-service** | 100% | ✅ Completo | Validación precios vs restaurant-service ✅, node-pg-migrate ✅, .env ✅, subscriptions ✅, restaurantOrders query ✅, ownership verification ✅ |
 | **auth-service** | 100% | ✅ Completo | register/login/logout/refreshToken, bcrypt+JWT, Redis blacklist, rate limiting (5/15min), 37 tests 100% coverage, sessionStorage ready ✅ |
 | **restaurant-service** | 100% | ✅ Completo | CRUD+cache Redis, Kafka producer, owner auth ✅, /metrics ✅, Helm ✅, 61 tests ~90% coverage, menuItems batch query ✅ |
-| **api-gateway** | 100% | ✅ Completo | Federation 3 subgraphs ✅, rate limiting Redis ✅, WebSocket subscriptions proxy ✅, Helm ✅, 22 tests |
+| **api-gateway** | 100% | ✅ Completo | Federation 3 subgraphs ✅, rate limiting Redis ✅, WebSocket subscriptions proxy ✅, **isBinary flag fix (text/binario WebSocket)** ✅, Helm ✅, 22 tests |
 | **delivery-service** | 100% | ✅ Completo | Kafka consumers ✅, retry/backoff+DLQ ✅, GraphQL subscriptions ✅, Helm ✅, 48 tests ✅ |
 | **notification-service** | 100% | ✅ Completo | 5 Kafka consumers ✅, retry/backoff+DLQ ✅, mock email/SMS ✅, subscriptions ✅, Helm ✅, 33 tests ✅ |
 | **Kafka** | 100% | ✅ Completo | Init script ✅, consumer groups ✅, DLQs ✅, retry/backoff exponencial ✅ |
@@ -37,7 +37,7 @@ Plataforma cloud-native distribuida, escalable. Inspirada en Uber Eats. Microser
 | **Deploy VPS** | 95% | ✅ Completo | deploy.sh ✅ — Nginx ✅, SSL Certbot ✅, Kafka IP patch ✅, api-gateway .env ✅ |
 | **Documentación** | ~80% | 🚧 Avanzando | README portfolio ✅, Grafana screenshots ✅, test-credentials.txt ✅ — faltan runbooks, devops guide |
 | **Tests** | 100% | ✅ Completo | auth(37) ✅, restaurant(61) ✅, order(45) ✅, delivery(48) ✅, notification(33) ✅, api-gateway(22) ✅ — 246 total, 0 failures |
-| **Frontend** | 99% | 🚧 Casi Completo | Landing (parallax, animaciones scroll, modo noche, diseño premium) ✅, Login ✅, Register ✅, Restaurants ✅, RestaurantDetail ✅, Orders ✅, OrderTracking ✅, Profile ✅, Cart ✅, Checkout ✅, RestaurantDashboard (owner) ✅, BottomNav role-based ✅, responsive mobile ✅, Apollo Client ✅, ThemeContext ✅, ThemeToggle ✅, WCAG 2.2 ✅, SEO ✅, Code splitting (React.lazy) ✅, Helm chart ✅ |
+| **Frontend** | 99% | 🚧 Casi Completo | Landing (parallax, animaciones scroll, modo noche, diseño premium) ✅, Login ✅, Register ✅, Restaurants ✅, RestaurantDetail ✅, Orders ✅, OrderTracking ✅, Profile ✅, Cart ✅, Checkout ✅, RestaurantDashboard (owner) ✅, BottomNav role-based ✅, responsive mobile ✅, Apollo Client ✅, ThemeContext ✅, ThemeToggle ✅, WCAG 2.2 ✅, SEO ✅, Code splitting (React.lazy) ✅, Helm chart ✅, **Real-time subscription (WebSocket + Redis PubSub + useState onData)** ✅ |
 
 **Progreso Total: ~96%**
 
