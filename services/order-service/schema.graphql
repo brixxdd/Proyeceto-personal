@@ -4,6 +4,7 @@ extend schema
 type Query {
   orders(status: OrderStatus, limit: Int, offset: Int): [Order!]!
   order(id: ID!): Order
+  restaurantOrders(restaurantId: ID!, status: OrderStatus, limit: Int, offset: Int): [Order!]!
 }
 
 type Mutation {

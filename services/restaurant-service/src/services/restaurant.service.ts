@@ -237,7 +237,7 @@ export class RestaurantService {
 
     // Invalidate cache
     await this.invalidateRestaurantsCache();
-    await this.redis.del(`restaurant:${input.id}`).catch(() => {});
+    await this.redis.del(`restaurant:${input.id}`).catch(() => { });
 
     logger.info('Restaurant updated', { id: restaurant.id });
 
@@ -254,7 +254,7 @@ export class RestaurantService {
 
     // Invalidate cache
     await this.invalidateRestaurantsCache();
-    await this.redis.del(`restaurant:${id}`).catch(() => {});
+    await this.redis.del(`restaurant:${id}`).catch(() => { });
 
     logger.info('Restaurant deleted', { id });
 
@@ -301,6 +301,16 @@ export class RestaurantService {
     return this.mapMenuItem(result.rows[0]);
   }
 
+  async getMenuItemsByIds(ids: string[]): Promise<MenuItem[]> {
+    if (ids.length === 0) return [];
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+    const result = await this.pool.query(
+      `SELECT * FROM menu_items WHERE id IN (${placeholders})`,
+      ids
+    );
+    return result.rows.map(this.mapMenuItem);
+  }
+
   async createMenuItem(input: CreateMenuItemInput): Promise<MenuItem> {
     const result = await this.pool.query(
       `INSERT INTO menu_items (restaurant_id, name, description, price, category, is_available)
@@ -312,7 +322,7 @@ export class RestaurantService {
     const menuItem = this.mapMenuItem(result.rows[0]);
 
     // Invalidate menu cache
-    await this.redis.del(`menu:${input.restaurantId}`).catch(() => {});
+    await this.redis.del(`menu:${input.restaurantId}`).catch(() => { });
 
     logger.info('Menu item created', { id: menuItem.id, name: menuItem.name });
 
@@ -369,7 +379,7 @@ export class RestaurantService {
     const menuItem = this.mapMenuItem(result.rows[0]);
 
     // Invalidate cache
-    await this.redis.del(`menu:${menuItem.restaurantId}`).catch(() => {});
+    await this.redis.del(`menu:${menuItem.restaurantId}`).catch(() => { });
 
     logger.info('Menu item updated', { id: menuItem.id });
 
@@ -390,7 +400,7 @@ export class RestaurantService {
     await this.pool.query('DELETE FROM menu_items WHERE id = $1', [id]);
 
     // Invalidate cache
-    await this.redis.del(`menu:${menuItem.restaurantId}`).catch(() => {});
+    await this.redis.del(`menu:${menuItem.restaurantId}`).catch(() => { });
 
     logger.info('Menu item deleted', { id });
 
@@ -435,7 +445,7 @@ export class RestaurantService {
   }
 
   private async invalidateRestaurantsCache(): Promise<void> {
-    await this.redis.del('restaurants:all').catch(() => {});
-    await this.redis.del('restaurants:open').catch(() => {});
+    await this.redis.del('restaurants:all').catch(() => { });
+    await this.redis.del('restaurants:open').catch(() => { });
   }
 }

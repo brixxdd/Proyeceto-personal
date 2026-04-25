@@ -10,10 +10,11 @@ const LINKS = [
 export default function Navbar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const token = localStorage.getItem('token')
+  const token = sessionStorage.getItem('token')
 
   function handleLogout() {
-    localStorage.removeItem('token')
+    sessionStorage.removeItem('token')
+    sessionStorage.removeItem('user_role')
     navigate('/login')
   }
 
@@ -23,7 +24,7 @@ export default function Navbar() {
       animate={{ y: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className="sticky top-0 z-50 glass-card"
-      style={{ 
+      style={{
         borderBottom: '1px solid var(--color-border)',
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4px)'
       }}

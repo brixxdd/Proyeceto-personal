@@ -4,6 +4,7 @@ export const typeDefs = `#graphql
     restaurant(id: ID!): Restaurant
     menu(restaurantId: ID!): [MenuItem!]!
     menuItem(id: ID!): MenuItem
+    menuItems(ids: [ID!]!): [MenuItem!]!
   }
 
   extend type Mutation {

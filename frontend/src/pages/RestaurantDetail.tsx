@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
@@ -6,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Minus, ShoppingCart, ArrowLeft, Star, Clock } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
 import { slideUp, staggerContainer, bouncyTransition } from '../lib/animations'
+import { useCart } from '../context/CartContext'
 
 const GET_RESTAURANT = gql`
   query GetRestaurant($id: ID!) {
@@ -67,39 +67,49 @@ function getBannerStyle(cuisineType: string = '') {
 export default function RestaurantDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [cart, setCart] = useState<Record<string, number>>({})
+  const { addItem, removeItem, items, itemCount, total, restaurantId } = useCart()
   const { data, loading, error } = useQuery<any>(GET_RESTAURANT, { variables: { id } })
   const [createOrder, { loading: ordering }] = useMutation(CREATE_ORDER)
 
-  function addItem(itemId: string) {
-    setCart(c => ({ ...c, [itemId]: (c[itemId] ?? 0) + 1 }))
+  // Get quantity of specific menu item in cart
+  function getItemQuantity(menuItemId: string) {
+    return items.find(i => i.menuItemId === menuItemId)?.quantity ?? 0
   }
 
-  function removeItem(itemId: string) {
-    setCart(c => {
-      const next = { ...c }
-      if (next[itemId] <= 1) delete next[itemId]
-      else next[itemId]--
-      return next
-    })
-  }
-
-  const cartTotal = data?.menu
-    ?.filter((i: MenuItem) => cart[i.id])
-    .reduce((sum: number, i: MenuItem) => sum + i.price * (cart[i.id] ?? 0), 0) ?? 0
-
-  const cartCount = Object.values(cart).reduce((a, b) => a + b, 0)
+  // Only show cart button if items are from this restaurant (or cart is empty)
+  const cartCount = (restaurantId === id || !restaurantId) ? itemCount : 0
+  const cartTotal = (restaurantId === id || !restaurantId) ? total : 0
 
   async function handleOrder() {
-    if (!localStorage.getItem('token')) { navigate('/login'); return }
+    if (!sessionStorage.getItem('token')) { navigate('/login'); return }
+    if (!id) return
     try {
-      const items = Object.entries(cart).map(([menuItemId, quantity]) => ({ menuItemId, quantity }))
-      const result = await createOrder({ variables: { input: { restaurantId: id, items, deliveryAddress: DEFAULT_ADDRESS } } })
+      const cartItems = items
+        .filter(i => i.restaurantId === id)
+        .map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity }))
+      if (cartItems.length === 0) return
+      const result = await createOrder({ variables: { input: { restaurantId: id, items: cartItems, deliveryAddress: DEFAULT_ADDRESS } } })
       navigate(`/orders/${(result.data as any).createOrder.id}`)
     } catch (err: any) {
       console.error(err)
       alert(err.message || 'Error al procesar el pedido')
     }
+  }
+
+  function handleAddToCart(menuItem: MenuItem, restaurantName: string) {
+    if (restaurantId && restaurantId !== id) {
+      // Cart has items from different restaurant — warn user
+      if (!confirm('Tu carrito tiene artículos de otro restaurante. ¿Quieres vaciarlo y agregar este artículo?')) return
+    }
+    addItem({
+      menuItemId: menuItem.id,
+      restaurantId: id!,
+      restaurantName,
+      name: menuItem.name,
+      description: menuItem.description,
+      price: menuItem.price,
+      category: menuItem.category,
+    })
   }
 
   if (loading) return (
@@ -208,68 +218,71 @@ export default function RestaurantDetail() {
             initial="initial"
             animate="animate"
           >
-            {menu?.map((item: MenuItem) => (
-              <motion.div
-                key={item.id}
-                variants={slideUp}
-                className="flex justify-between items-center p-5 rounded-[24px] bg-white border border-[var(--color-border)] ios-shadow-sm transition-opacity"
-                style={{ opacity: item.isAvailable ? 1 : 0.45 }}
-              >
-                <div className="flex-1 min-w-0 pr-4">
-                  <p className="font-bold text-[17px] text-[var(--color-foreground)]">{item.name}</p>
-                  <p className="text-[14px] mt-1 line-clamp-2 leading-relaxed text-[var(--color-muted-foreground)] font-medium">
-                    {item.description}
-                  </p>
-                  <p className="text-[16px] font-bold mt-2 text-[var(--color-primary)]">
-                    ${item.price.toFixed(2)}
-                  </p>
-                </div>
-
-                {item.isAvailable && (
-                  <div className="flex items-center gap-3 shrink-0">
-                    <AnimatePresence mode="popLayout">
-                      {cart[item.id] ? (
-                         <motion.div
-                          className="flex items-center gap-3"
-                          initial={{ opacity: 0, scale: 0.8, width: 0 }}
-                          animate={{ opacity: 1, scale: 1, width: 'auto' }}
-                          exit={{ opacity: 0, scale: 0.8, width: 0 }}
-                          transition={bouncyTransition}
-                        >
-                          <motion.button
-                            onClick={() => removeItem(item.id)}
-                            whileTap={{ scale: 0.9 }}
-                            className="w-10 h-10 rounded-full flex items-center justify-center cursor-pointer bg-[var(--color-muted)] text-[var(--color-foreground)] transition-colors active:bg-[var(--color-border)]"
-                            aria-label="Quitar uno"
-                          >
-                            <Minus size={16} strokeWidth={2.5} />
-                          </motion.button>
-                          <motion.span
-                            key={cart[item.id]}
-                            initial={{ scale: 1.4 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: 'spring', stiffness: 600, damping: 20 }}
-                            className="w-5 text-center text-[16px] font-bold tracking-tight text-[var(--color-foreground)]"
-                          >
-                            {cart[item.id]}
-                          </motion.span>
-                        </motion.div>
-                      ) : null}
-                    </AnimatePresence>
-                    <motion.button
-                      onClick={() => addItem(item.id)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.9 }}
-                      transition={bouncyTransition}
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white cursor-pointer bg-[var(--color-foreground)] ios-shadow transition-colors"
-                      aria-label={`Añadir ${item.name}`}
-                    >
-                      <Plus size={18} strokeWidth={2.5} />
-                    </motion.button>
+            {menu?.map((item: MenuItem) => {
+              const qty = getItemQuantity(item.id)
+              return (
+                <motion.div
+                  key={item.id}
+                  variants={slideUp}
+                  className="flex justify-between items-center p-5 rounded-[24px] bg-white border border-[var(--color-border)] ios-shadow-sm transition-opacity"
+                  style={{ opacity: item.isAvailable ? 1 : 0.45 }}
+                >
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="font-bold text-[17px] text-[var(--color-foreground)]">{item.name}</p>
+                    <p className="text-[14px] mt-1 line-clamp-2 leading-relaxed text-[var(--color-muted-foreground)] font-medium">
+                      {item.description}
+                    </p>
+                    <p className="text-[16px] font-bold mt-2 text-[var(--color-primary)]">
+                      ${item.price.toFixed(2)}
+                    </p>
                   </div>
-                )}
-              </motion.div>
-            ))}
+
+                  {item.isAvailable && (
+                    <div className="flex items-center gap-3 shrink-0">
+                      <AnimatePresence mode="popLayout">
+                        {qty > 0 ? (
+                          <motion.div
+                            className="flex items-center gap-3"
+                            initial={{ opacity: 0, scale: 0.8, width: 0 }}
+                            animate={{ opacity: 1, scale: 1, width: 'auto' }}
+                            exit={{ opacity: 0, scale: 0.8, width: 0 }}
+                            transition={bouncyTransition}
+                          >
+                            <motion.button
+                              onClick={() => removeItem(item.id)}
+                              whileTap={{ scale: 0.9 }}
+                              className="w-10 h-10 rounded-full flex items-center justify-center cursor-pointer bg-[var(--color-muted)] text-[var(--color-foreground)] transition-colors active:bg-[var(--color-border)]"
+                              aria-label="Quitar uno"
+                            >
+                              <Minus size={16} strokeWidth={2.5} />
+                            </motion.button>
+                            <motion.span
+                              key={qty}
+                              initial={{ scale: 1.4 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: 'spring', stiffness: 600, damping: 20 }}
+                              className="w-5 text-center text-[16px] font-bold tracking-tight text-[var(--color-foreground)]"
+                            >
+                              {qty}
+                            </motion.span>
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
+                      <motion.button
+                        onClick={() => handleAddToCart(item, restaurant.name)}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.9 }}
+                        transition={bouncyTransition}
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white cursor-pointer bg-[var(--color-foreground)] ios-shadow transition-colors"
+                        aria-label={`Añadir ${item.name}`}
+                      >
+                        <Plus size={18} strokeWidth={2.5} />
+                      </motion.button>
+                    </div>
+                  )}
+                </motion.div>
+              )
+            })}
           </motion.div>
         </div>
 
@@ -278,7 +291,7 @@ export default function RestaurantDetail() {
           {cartCount > 0 && (
             <motion.div
               className="fixed bottom-6 left-1/2 w-full max-w-sm px-6 z-40 transform-gpu"
-              style={{ 
+              style={{
                 x: '-50%',
                 paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6px)'
               }}

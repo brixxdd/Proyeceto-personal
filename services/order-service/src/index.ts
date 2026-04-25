@@ -28,6 +28,7 @@ import { register as metricsRegister, connectionStatus } from './metrics/prometh
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const RESTAURANT_DB_URL = process.env.RESTAURANT_DB_URL || 'postgresql://postgres:postgres@postgres-restaurant:5432/restaurant_db';
 
 // HTTP server wrapping Express (required for WebSocket co-location)
 const httpServer = createServer(app);
@@ -35,6 +36,11 @@ const httpServer = createServer(app);
 // Database
 const dbPool = new Pool({
   connectionString: process.env.DATABASE_URL,
+});
+
+// Restaurant DB — used to verify ownerId on restaurantOrders queries
+const restaurantDbPool = new Pool({
+  connectionString: RESTAURANT_DB_URL,
 });
 
 // Redis — two clients: one for cache/commands, two dedicated to PubSub
@@ -66,7 +72,7 @@ const orderService = new OrderService(
   pubSub,
   process.env.RESTAURANT_SERVICE_URL || 'http://localhost:3001',
 );
-const orderResolver = new OrderResolver(orderService);
+const orderResolver = new OrderResolver(orderService, restaurantDbPool);
 
 // GraphQL schema + resolvers
 const typeDefsString = readFileSync(join(__dirname, '../schema.graphql'), 'utf-8');
@@ -75,6 +81,7 @@ const resolvers = {
   Query: {
     orders: orderResolver.getOrders.bind(orderResolver),
     order: orderResolver.getOrderById.bind(orderResolver),
+    restaurantOrders: orderResolver.getRestaurantOrders.bind(orderResolver),
   },
   Mutation: {
     createOrder: orderResolver.createOrder.bind(orderResolver),

@@ -17,7 +17,7 @@ export class OrderService {
     private kafkaProducer: KafkaProducer,
     private pubSub: RedisPubSub,
     private restaurantServiceUrl: string = process.env.RESTAURANT_SERVICE_URL || 'http://localhost:3001',
-  ) {}
+  ) { }
 
   async createOrder(input: CreateOrderInput, customerId: string): Promise<Order> {
     const menuItemIds = input.items.map((item) => item.menuItemId);
@@ -66,7 +66,7 @@ export class OrderService {
 
     // Fetch from database
     const order = await this.orderRepository.findById(id);
-    
+
     if (order) {
       await this.cacheOrder(order);
     }
@@ -81,9 +81,13 @@ export class OrderService {
     return this.orderRepository.findByCustomerId(customerId, status, limit, offset);
   }
 
+  async getOrdersByRestaurantId(restaurantId: string, status?: OrderStatus, limit = 20, offset = 0): Promise<Order[]> {
+    return this.orderRepository.findByRestaurantId(restaurantId, status, limit, offset);
+  }
+
   async updateOrderStatus(id: string, status: OrderStatus, deliveryPersonId?: string): Promise<Order | null> {
     const order = await this.orderRepository.updateStatus(id, status, deliveryPersonId);
-    
+
     if (!order) {
       return null;
     }
@@ -124,11 +128,11 @@ export class OrderService {
   private async getCachedOrder(id: string): Promise<Order | null> {
     const key = `order:${id}`;
     const cached = await this.redisClient.get(key);
-    
+
     if (cached) {
       return JSON.parse(cached) as Order;
     }
-    
+
     return null;
   }
 }

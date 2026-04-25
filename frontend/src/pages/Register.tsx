@@ -25,7 +25,7 @@ export default function Register() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const { data } = await register({ variables: { ...form, role: 'CUSTOMER' } })
-    localStorage.setItem('token', (data as any).register.token)
+    sessionStorage.setItem('token', (data as any).register.token)
     navigate('/restaurants')
   }
 

@@ -1,3 +1,4 @@
+import { Pool } from 'pg';
 import { OrderService } from '../services/order.service';
 import { RedisPubSub, orderStatusChannel } from '../pubsub/redis.pubsub';
 import { Order, OrderStatus, CreateOrderInput } from '../models/order.model';
@@ -10,7 +11,10 @@ interface Context {
 }
 
 export class OrderResolver {
-  constructor(private orderService: OrderService) {}
+  constructor(
+    private orderService: OrderService,
+    private restaurantDbPool?: Pool
+  ) { }
 
   async getOrders(
     _parent: any,
@@ -36,6 +40,50 @@ export class OrderResolver {
       args.limit || 20,
       args.offset || 0
     );
+  }
+
+  async getRestaurantOrders(
+    _parent: any,
+    args: { restaurantId: string; status?: OrderStatus; limit?: number; offset?: number },
+    context: Context
+  ): Promise<Order[]> {
+    const user = requireAuth(context.auth);
+
+    // ADMIN puede ver cualquier pedido de cualquier restaurante
+    if (user.role === 'ADMIN') {
+      return this.orderService.getOrdersByRestaurantId(
+        args.restaurantId,
+        args.status,
+        args.limit || 20,
+        args.offset || 0
+      );
+    }
+
+    // RESTAURANT_OWNER solo puede ver pedidos de SUS restaurantes
+    if (user.role === 'RESTAURANT_OWNER') {
+      if (!this.restaurantDbPool) {
+        throw new Error('Restaurant database not configured');
+      }
+      // Verify this owner owns the requested restaurant
+      const result = await this.restaurantDbPool.query(
+        'SELECT owner_id FROM restaurants WHERE id = $1',
+        [args.restaurantId]
+      );
+      if (result.rows.length === 0) {
+        throw new Error('Restaurant not found');
+      }
+      if (result.rows[0].owner_id !== user.userId) {
+        throw new Error('Forbidden: you do not own this restaurant');
+      }
+      return this.orderService.getOrdersByRestaurantId(
+        args.restaurantId,
+        args.status,
+        args.limit || 20,
+        args.offset || 0
+      );
+    }
+
+    throw new Error('Forbidden: only ADMIN or RESTAURANT_OWNER can view restaurant orders');
   }
 
   async getOrderById(
@@ -70,10 +118,35 @@ export class OrderResolver {
     args: { id: string; status: OrderStatus },
     context: Context
   ): Promise<Order | null> {
-    requireAuth(context.auth);
+    const user = requireAuth(context.auth);
 
-    // In production, check if user has permission (restaurant owner, admin, etc.)
-    return this.orderService.updateOrderStatus(args.id, args.status);
+    const order = await this.orderService.getOrderById(args.id);
+    if (!order) return null;
+
+    // ADMIN can update any order
+    if (user.role === 'ADMIN') {
+      return this.orderService.updateOrderStatus(args.id, args.status);
+    }
+
+    // RESTAURANT_OWNER can only update orders for their own restaurants
+    if (user.role === 'RESTAURANT_OWNER') {
+      if (!this.restaurantDbPool) {
+        throw new Error('Restaurant database not configured');
+      }
+      const result = await this.restaurantDbPool.query(
+        'SELECT owner_id FROM restaurants WHERE id = $1',
+        [order.restaurantId]
+      );
+      if (result.rows.length === 0) {
+        throw new Error('Restaurant not found');
+      }
+      if (result.rows[0].owner_id !== user.userId) {
+        throw new Error('Forbidden: you do not own this restaurant');
+      }
+      return this.orderService.updateOrderStatus(args.id, args.status);
+    }
+
+    throw new Error('Forbidden: only ADMIN or RESTAURANT_OWNER can update order status');
   }
 
   async cancelOrder(
@@ -109,4 +182,3 @@ export class OrderResolver {
     ) as unknown as AsyncIterable<Order>;
   }
 }
-

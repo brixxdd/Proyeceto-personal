@@ -62,6 +62,10 @@ export const resolvers = {
       }
       return item;
     },
+    menuItems: async (_parent: any, args: { ids: string[] }) => {
+      logger.debug('Query: menuItems', args);
+      return restaurantService.getMenuItemsByIds(args.ids);
+    },
   },
   Mutation: {
     createRestaurant: async (_parent: any, args: any, context: Context) => {

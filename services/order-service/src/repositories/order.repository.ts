@@ -7,11 +7,11 @@ interface CreateOrderData extends CreateOrderInput {
 }
 
 export class OrderRepository {
-  constructor(private pool: Pool) {}
+  constructor(private pool: Pool) { }
 
   async createOrder(orderData: CreateOrderData, customerId: string): Promise<Order> {
     const client = await this.pool.connect();
-    
+
     try {
       await client.query('BEGIN');
 
@@ -103,9 +103,9 @@ export class OrderRepository {
       LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE o.customer_id = $1
     `;
-    
+
     const params: any[] = [customerId];
-    
+
     if (status) {
       query += ` AND o.status = $2`;
       params.push(status);
@@ -135,9 +135,9 @@ export class OrderRepository {
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
     `;
-    
+
     const params: any[] = [];
-    
+
     if (status) {
       query += ` WHERE o.status = $1`;
       params.push(status);
@@ -145,6 +145,39 @@ export class OrderRepository {
       params.push(limit, offset);
     } else {
       query += ` GROUP BY o.id ORDER BY o.created_at DESC LIMIT $1 OFFSET $2`;
+      params.push(limit, offset);
+    }
+
+    const result = await this.pool.query(query, params);
+    return result.rows.map(row => this.mapRowToOrder(row, row.items || []));
+  }
+
+  async findByRestaurantId(restaurantId: string, status?: OrderStatus, limit = 20, offset = 0): Promise<Order[]> {
+    let query = `
+      SELECT o.*, 
+             json_agg(
+               json_build_object(
+                 'id', oi.id,
+                 'menuItemId', oi.menu_item_id,
+                 'quantity', oi.quantity,
+                 'price', oi.price,
+                 'subtotal', oi.subtotal
+               )
+             ) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.restaurant_id = $1
+    `;
+
+    const params: any[] = [restaurantId];
+
+    if (status) {
+      query += ` AND o.status = $2`;
+      params.push(status);
+      query += ` GROUP BY o.id ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(limit, offset);
+    } else {
+      query += ` GROUP BY o.id ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       params.push(limit, offset);
     }
 
@@ -189,8 +222,8 @@ export class OrderRepository {
       restaurantId: row.restaurant_id,
       status: row.status as OrderStatus,
       totalAmount: parseFloat(row.total_amount),
-      deliveryAddress: typeof row.delivery_address === 'string' 
-        ? JSON.parse(row.delivery_address) 
+      deliveryAddress: typeof row.delivery_address === 'string'
+        ? JSON.parse(row.delivery_address)
         : row.delivery_address,
       deliveryPersonId: row.delivery_person_id,
       estimatedDeliveryTime: row.estimated_delivery_time,

@@ -1,0 +1,93 @@
+# ============================================================
+# FoodDash — Quick Start: Levantar todo el cluster
+# ============================================================
+# Comando UNICO para levantar absolutamente TODO:
+# (backend + infrastructure + observability + adminer)
+
+docker-compose up -d
+
+# ============================================================
+# URLs de servicios (disponibles al levantar)
+# ============================================================
+# Frontend (Vite dev)    : http://localhost:5173
+# API Gateway (GraphQL)  : http://localhost:4000/graphql
+# Adminer (DB explorer)  : http://localhost:8080
+# Grafana                : http://localhost:3000
+# Prometheus             : http://localhost:9090
+# Jaeger (tracing)       : http://localhost:16686
+# Alertmanager           : http://localhost:9093
+# Loki                   : http://localhost:3100
+
+# ============================================================
+# Para ver logs de todos los servicios
+# ============================================================
+docker-compose logs -f
+
+# ============================================================
+# Para ver logs de un servicio específico
+# ============================================================
+docker-compose logs -f api-gateway
+docker-compose logs -f auth-service
+docker-compose logs -f restaurant-service
+docker-compose logs -f order-service
+docker-compose logs -f delivery-service
+docker-compose logs -f notification-service
+
+# ============================================================
+# Estado de los contenedores
+# ============================================================
+docker-compose ps
+
+# ============================================================
+# Reiniciar todo (down + up)
+# ============================================================
+docker-compose down && docker-compose up -d
+
+# ============================================================
+# Detener todo
+# ============================================================
+docker-compose down
+
+# ============================================================
+# Rebuild de un servicio (sin cache)
+# ============================================================
+docker-compose build --no-cache <servicio>
+docker-compose up -d <servicio>
+
+# Ejemplo: rebuild de api-gateway
+# docker-compose build --no-cache api-gateway && docker-compose up -d api-gateway
+
+# ============================================================
+# Base de datos: conectarte desde tu máquina host
+# ============================================================
+# Auth DB         : localhost:5433  / auth_db
+# Restaurant DB   : localhost:5434  / restaurant_db
+# Order DB       : localhost:5435  / order_db
+# Delivery DB    : localhost:5436  / delivery_db
+# Notification DB: localhost:5437  / notification_db
+# (usuario: postgres / password: postgres)
+
+# ============================================================
+# Seed data (datos de prueba)
+# ============================================================
+# Los datos de prueba se generan automáticamente via docker-compose.yaml kafka-init
+# Para regenerar manualmente: docker-compose run --rm kafka-init
+
+# ============================================================
+# Verificar que todo está corriendo
+# ============================================================
+# 1. Health check del gateway
+curl http://localhost:4000/health
+
+# 2. Ver Prometheus targets
+# http://localhost:9090/targets
+
+# 3. Ver Grafana dashboards
+# http://localhost:3000 (admin/admin)
+
+# ============================================================
+# IMPORTANTE: Si Kafka no conecta al primer intento
+# ============================================================
+# Kafka necesita ~30s para inicializarse. Si los servicios
+# que dependen de Kafka fallan al inicio, espera 30s y:
+docker-compose restart order-service delivery-service notification-service kafka-init

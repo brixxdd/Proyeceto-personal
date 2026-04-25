@@ -20,15 +20,22 @@ export default function Login() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPass, setShowPass] = useState(false)
-  const [login, { loading, error }] = useMutation(LOGIN)
+  const [login, { loading, error }] = useMutation<any>(LOGIN)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     try {
       const { data } = await login({ variables: form })
       if (data?.login?.token) {
-        localStorage.setItem('token', data.login.token)
-        navigate('/restaurants')
+        sessionStorage.setItem('token', data.login.token)
+        sessionStorage.setItem('user_role', data.login.user?.role || '')
+        // Role-based redirect
+        const role = data.login.user?.role
+        if (role === 'RESTAURANT_OWNER' || role === 'ADMIN') {
+          navigate('/dashboard')
+        } else {
+          navigate('/restaurants')
+        }
       }
     } catch { /* error state handled by Apollo */ }
   }
