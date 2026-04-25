@@ -1,10 +1,11 @@
 import { useParams, Link } from 'react-router-dom'
-import { useQuery, useSubscription } from '@apollo/client/react'
+import { useQuery, useApolloClient } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { motion } from 'framer-motion'
 import { CheckCircle, Truck, ChefHat, Package, Clock, ArrowLeft, RefreshCw } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
 import { slideUp, staggerContainer } from '../lib/animations'
+import { useEffect } from 'react'
 
 const GET_ORDER = gql`
   query GetOrder($id: ID!) {
@@ -70,20 +71,49 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function OrderTracking() {
   const { id } = useParams<{ id: string }>()
+  const client = useApolloClient()
 
   // Initial order data via query
   const { data, loading, error } = useQuery<any>(GET_ORDER, {
     variables: { id },
   })
 
-  // Real-time subscription for order status updates
-  const { data: subData } = useSubscription<any>(ORDER_STATUS_SUBSCRIPTION, {
-    variables: { orderId: id },
-    skip: !id,
-  })
+  // Set up robust manual subscription
+  useEffect(() => {
+    if (!id) return
 
-  // Merge: subscription data overrides query data when available
-  const order = subData?.orderStatusChanged || data?.order
+    const observable = client.subscribe<any>({
+      query: ORDER_STATUS_SUBSCRIPTION,
+      variables: { orderId: id },
+    })
+
+    const subscription = observable.subscribe({
+      next: ({ data }) => {
+        if (data?.orderStatusChanged) {
+          const updatedOrder = data.orderStatusChanged
+          
+          // Modify cache directly - this guarantees useQuery will trigger a re-render
+          client.cache.modify({
+            id: client.cache.identify({ __typename: 'Order', id }),
+            fields: {
+              status() { return updatedOrder.status },
+              updatedAt() { return updatedOrder.updatedAt },
+              totalAmount() { return updatedOrder.totalAmount },
+            }
+          })
+        }
+      },
+      error: (err) => {
+        console.error('Subscription error:', err)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [id, client])
+
+  const order = data?.order
 
   if (loading && !order) return (
     <PageTransition>
@@ -147,12 +177,10 @@ export default function OrderTracking() {
             <p className="text-sm font-mono" style={{ color: 'var(--color-muted-foreground)' }}>
               #{order.id?.slice(0, 8)}
             </p>
-            {subData?.orderStatusChanged && (
-              <span className="flex items-center gap-1 text-[12px]" style={{ color: '#34C759' }}>
-                <RefreshCw size={12} className="animate-spin-slow" />
-                Actualizado en tiempo real
-              </span>
-            )}
+            <span className="flex items-center gap-1 text-[12px]" style={{ color: '#34C759' }}>
+              <RefreshCw size={12} className="animate-spin-slow" />
+              Actualización en vivo
+            </span>
           </motion.div>
         </motion.div>
 

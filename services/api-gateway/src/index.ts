@@ -179,23 +179,23 @@ async function startServer() {
   wsServer.on('connection', (downstream) => {
     const protocol = downstream.protocol || 'graphql-transport-ws';
     const upstream = new WebSocket(ORDER_SERVICE_WS_URL, protocol);
-    const queue: WebSocket.RawData[] = [];
+    const queue: { data: WebSocket.RawData; isBinary: boolean }[] = [];
 
     upstream.on('open', () => {
-      for (const msg of queue) upstream.send(msg);
+      for (const msg of queue) upstream.send(msg.data, { binary: msg.isBinary });
       queue.length = 0;
     });
 
-    downstream.on('message', (data) => {
+    downstream.on('message', (data, isBinary) => {
       if (upstream.readyState === WebSocket.OPEN) {
-        upstream.send(data);
+        upstream.send(data, { binary: isBinary });
       } else {
-        queue.push(data);
+        queue.push({ data, isBinary });
       }
     });
 
-    upstream.on('message', (data) => {
-      if (downstream.readyState === WebSocket.OPEN) downstream.send(data);
+    upstream.on('message', (data, isBinary) => {
+      if (downstream.readyState === WebSocket.OPEN) downstream.send(data, { binary: isBinary });
     });
 
     downstream.on('close', (code, reason) => {
