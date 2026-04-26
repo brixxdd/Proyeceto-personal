@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # FoodDash — Cluster Startup Script
-# Levanta todo el cluster con wait logic para Kafka
+# Levanta todo el cluster con wait logic para Zookeeper + Kafka
 # Uso: ./start-cluster.sh
 # ============================================================
 
@@ -11,7 +11,7 @@ echo "🚀 FoodDash Cluster Startup"
 echo "================================"
 
 # 1. Levantar infrastructure crítica primero
-echo "📦 Step 1: Levantando infraestructura (Postgres, Redis, Kafka)..."
+echo "📦 Step 1: Levantando infraestructura (Postgres, Redis, Zookeeper, Kafka)..."
 docker-compose up -d \
   postgres-auth \
   postgres-restaurant \
@@ -23,25 +23,44 @@ docker-compose up -d \
   kafka
 
 echo ""
-echo "⏳ Esperando a que Kafka esté healthy (esto toma ~30-40s)..."
-
-# Wait for Kafka to be healthy
-MAX_RETRIES=30
+echo "⏳ Esperando a que Zookeeper esté healthy..."
+MAX_ZOOKEEPER_RETRIES=30
 RETRY_INTERVAL=2
 retries=0
 
-while [ $retries -lt $MAX_RETRIES ]; do
+while [ $retries -lt $MAX_ZOOKEEPER_RETRIES ]; do
+  if docker inspect --format='{{.State.Health.Status}}' food-delivery-zookeeper 2>/dev/null | grep -q "healthy"; then
+    echo "✅ Zookeeper está healthy!"
+    break
+  fi
+  retries=$((retries + 1))
+  echo "  Zookeeper intentando $retries/$MAX_ZOOKEEPER_RETRIES... (esperando ${RETRY_INTERVAL}s)"
+  sleep $RETRY_INTERVAL
+done
+
+if [ $retries -eq $MAX_ZOOKEEPER_RETRIES ]; then
+  echo "⚠️  Zookeeper no respondió en ${MAX_ZOOKEEPER_RETRIES}x${RETRY_INTERVAL}s, continuando..."
+fi
+
+echo ""
+echo "⏳ Esperando a que Kafka esté healthy (esto toma ~30-60s)..."
+
+# Wait for Kafka to be healthy
+MAX_KAFKA_RETRIES=60
+retries=0
+
+while [ $retries -lt $MAX_KAFKA_RETRIES ]; do
   if docker inspect --format='{{.State.Health.Status}}' food-delivery-kafka 2>/dev/null | grep -q "healthy"; then
     echo "✅ Kafka está healthy!"
     break
   fi
   retries=$((retries + 1))
-  echo "  Intentando $retries/$MAX_RETRIES... (esperando ${RETRY_INTERVAL}s)"
+  echo "  Kafka intentando $retries/$MAX_KAFKA_RETRIES... (esperando ${RETRY_INTERVAL}s)"
   sleep $RETRY_INTERVAL
 done
 
-if [ $retries -eq $MAX_RETRIES ]; then
-  echo "⚠️  Kafka no respondió en ${MAX_RETRIES}x${RETRY_INTERVAL}s, continuando de todos modos..."
+if [ $retries -eq $MAX_KAFKA_RETRIES ]; then
+  echo "⚠️  Kafka no respondió en ${MAX_KAFKA_RETRIES}x${RETRY_INTERVAL}s, continuando de todos modos..."
 fi
 
 # 2. Levantar servicios del backend

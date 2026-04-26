@@ -3,6 +3,8 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import Navbar from './components/layout/Navbar'
 import BottomNav from './components/layout/BottomNav'
+import ProtectedRoute from './components/ProtectedRoute'
+import RoleRoute from './components/RoleRoute'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -89,54 +91,68 @@ export default function App() {
                   <Route
                     path="/orders"
                     element={
-                      <Suspense fallback={<OrdersSkeleton />}>
-                        <LazyOrders />
-                      </Suspense>
+                      <ProtectedRoute>
+                        <Suspense fallback={<OrdersSkeleton />}>
+                          <LazyOrders />
+                        </Suspense>
+                      </ProtectedRoute>
                     }
                   />
 
                   <Route
                     path="/orders/:id"
                     element={
-                      <Suspense fallback={<PageSkeleton />}>
-                        <LazyOrderTracking />
-                      </Suspense>
+                      <ProtectedRoute>
+                        <Suspense fallback={<PageSkeleton />}>
+                          <LazyOrderTracking />
+                        </Suspense>
+                      </ProtectedRoute>
                     }
                   />
 
                   <Route
                     path="/profile"
                     element={
-                      <Suspense fallback={<PageSkeleton />}>
-                        <LazyProfile />
-                      </Suspense>
+                      <ProtectedRoute>
+                        <Suspense fallback={<PageSkeleton />}>
+                          <LazyProfile />
+                        </Suspense>
+                      </ProtectedRoute>
                     }
                   />
 
                   <Route
                     path="/cart"
                     element={
-                      <Suspense fallback={<PageSkeleton />}>
-                        <LazyCart />
-                      </Suspense>
+                      <ProtectedRoute>
+                        <Suspense fallback={<PageSkeleton />}>
+                          <LazyCart />
+                        </Suspense>
+                      </ProtectedRoute>
                     }
                   />
 
                   <Route
                     path="/checkout"
                     element={
-                      <Suspense fallback={<PageSkeleton />}>
-                        <LazyCheckout />
-                      </Suspense>
+                      <ProtectedRoute>
+                        <Suspense fallback={<PageSkeleton />}>
+                          <LazyCheckout />
+                        </Suspense>
+                      </ProtectedRoute>
                     }
                   />
 
                   <Route
                     path="/dashboard"
                     element={
-                      <Suspense fallback={<PageSkeleton />}>
-                        <LazyRestaurantDashboard />
-                      </Suspense>
+                      <ProtectedRoute>
+                        <RoleRoute allowedRoles="RESTAURANT_OWNER,ADMIN" redirectTo="/restaurants">
+                          <Suspense fallback={<PageSkeleton />}>
+                            <LazyRestaurantDashboard />
+                          </Suspense>
+                        </RoleRoute>
+                      </ProtectedRoute>
                     }
                   />
                 </Routes>
