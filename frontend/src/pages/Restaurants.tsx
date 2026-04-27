@@ -67,7 +67,7 @@ export default function Restaurants() {
         <div className="h-14 rounded-[16px] animate-pulse mb-6 bg-[var(--color-border)]" />
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="rounded-[28px] overflow-hidden bg-white border border-[var(--color-border)]">
+            <div key={i} className="rounded-[28px] overflow-hidden bg-[var(--color-card)] border border-[var(--color-border)]">
               <div className="h-40 animate-pulse bg-[var(--color-border)]" style={{ animationDelay: `${i * 60}ms` }} />
               <div className="p-5 flex flex-col gap-3">
                 <div className="h-5 w-3/4 rounded-lg animate-pulse bg-[var(--color-border)]" />
@@ -117,7 +117,7 @@ export default function Restaurants() {
             placeholder="Buscar restaurantes o cocina..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-11 pr-11 py-4 rounded-[16px] text-[15px] transition-colors border border-[var(--color-border)] bg-[var(--color-muted)] focus:bg-white"
+            className="w-full pl-11 pr-11 py-4 rounded-[16px] text-[15px] transition-colors border border-[var(--color-border)] bg-[var(--color-muted)] focus:bg-[var(--color-card)]"
           />
           <AnimatePresence>
             {search && (
@@ -183,7 +183,7 @@ export default function Restaurants() {
                   whileHover={{ y: -6 }}
                   whileTap={{ scale: 0.96 }}
                   transition={bouncyTransition}
-                  className="rounded-[28px] overflow-hidden bg-white border border-[var(--color-border)] ios-shadow"
+                  className="rounded-[28px] overflow-hidden bg-[var(--color-card)] border border-[var(--color-border)] ios-shadow"
                 >
                   <Link to={`/restaurants/${r.id}`} className="block">
                     {/* Cuisine banner */}

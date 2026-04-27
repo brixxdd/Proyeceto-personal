@@ -423,7 +423,7 @@ export default function RestaurantDashboard() {
                                 key={id}
                                 onClick={() => setActiveTab(id as Tab)}
                                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[12px] text-[14px] font-semibold transition-all ${activeTab === id
-                                    ? 'bg-white text-[var(--color-foreground)] ios-shadow-sm'
+                                    ? 'bg-[var(--color-card)] text-[var(--color-foreground)] ios-shadow-sm'
                                     : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
                                     }`}
                             >

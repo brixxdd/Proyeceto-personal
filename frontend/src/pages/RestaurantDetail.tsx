@@ -145,7 +145,7 @@ export default function RestaurantDetail() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.92 }}
               transition={bouncyTransition}
-              className="flex items-center justify-center w-11 h-11 rounded-full cursor-pointer bg-white text-[var(--color-foreground)] ios-shadow"
+              className="flex items-center justify-center w-11 h-11 rounded-full cursor-pointer bg-[var(--color-card)] text-[var(--color-foreground)] ios-shadow"
             >
               <ArrowLeft size={20} strokeWidth={2.5} />
             </motion.button>
@@ -205,7 +205,7 @@ export default function RestaurantDetail() {
                 <motion.div
                   key={item.id}
                   variants={slideUp}
-                  className="flex justify-between items-center p-5 rounded-[24px] bg-white border border-[var(--color-border)] ios-shadow-sm transition-opacity"
+                  className="flex justify-between items-center p-5 rounded-[24px] bg-[var(--color-card)] border border-[var(--color-border)] ios-shadow-sm transition-opacity"
                   style={{ opacity: item.isAvailable ? 1 : 0.45 }}
                 >
                   <div className="flex-1 min-w-0 pr-4">
@@ -254,7 +254,7 @@ export default function RestaurantDetail() {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.9 }}
                         transition={bouncyTransition}
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white cursor-pointer bg-[var(--color-foreground)] ios-shadow transition-colors"
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white cursor-pointer bg-[var(--color-primary)] ios-shadow transition-colors"
                         aria-label={`Añadir ${item.name}`}
                       >
                         <Plus size={18} strokeWidth={2.5} />
@@ -281,7 +281,7 @@ export default function RestaurantDetail() {
               exit={{ y: 100, opacity: 0, scale: 0.95 }}
               transition={bouncyTransition}
             >
-              <div className="absolute inset-0 top-6 -mb-6 bg-white blur-xl opacity-60 rounded-full" />
+              <div className="absolute inset-0 top-6 -mb-6 bg-[var(--color-card)] blur-xl opacity-60 rounded-full" />
               <motion.button
                 onClick={handleOrder}
                 whileHover={{ scale: 1.02, y: -2 }}
