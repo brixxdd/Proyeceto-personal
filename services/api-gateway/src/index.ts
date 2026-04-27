@@ -8,6 +8,7 @@ import { ApolloGateway, IntrospectAndCompose, RemoteGraphQLDataSource } from '@a
 import cors from 'cors';
 import { createClient as createRedisClient } from 'redis';
 import rateLimit from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
 import { WebSocketServer } from 'ws';
 import WebSocket from 'ws';
 import { collectDefaultMetrics, Registry } from 'prom-client';
@@ -46,17 +47,28 @@ async function initializeRedis(): Promise<any> {
 }
 
 // Rate limiting middleware
-function setupRateLimiter(_redis: any) {
-  const windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'); // 15 min
+function setupRateLimiter(redis: any) {
+  const windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000');
   const maxRequests = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100');
 
-  return rateLimit({
+  const options: any = {
     windowMs,
     max: maxRequests,
     message: { error: 'Too many requests, please try again later' },
     standardHeaders: true,
     legacyHeaders: false,
-  });
+  };
+
+  if (redis?.isOpen) {
+    options.store = new RedisStore({
+      sendCommand: (...args: string[]) => (redis as any).sendCommand(args),
+    } as any);
+    logger.info('Rate limiting with Redis store');
+  } else {
+    logger.warn('Rate limiting with in-memory store (Redis unavailable)');
+  }
+
+  return rateLimit(options);
 }
 
 // Configure Apollo Gateway with all 3 subgraphs

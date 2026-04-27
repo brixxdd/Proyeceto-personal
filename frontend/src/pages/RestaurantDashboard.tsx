@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useSubscription } from '@apollo/client/react'
+import { useQuery, useMutation, useApolloClient } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -56,10 +56,9 @@ const GET_STATS = gql`
 `
 
 // Subscriptions for real-time updates
-// "newOrder" matches the API Gateway schema field name
 const RESTAURANT_ORDER_CREATED = gql`
   subscription OnRestaurantOrderCreated($restaurantId: ID!) {
-    newOrder(restaurantId: $restaurantId) {
+    restaurantOrderCreated(restaurantId: $restaurantId) {
       id customerId status totalAmount
       items { id menuItemId quantity price subtotal }
       deliveryAddress { street city state zipCode }
@@ -148,21 +147,19 @@ type Tab = 'orders' | 'menu' | 'stats'
 
 export default function RestaurantDashboard() {
     const navigate = useNavigate()
+    const client = useApolloClient()
     const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<Tab>('orders')
     const [filterStatus, setFilterStatus] = useState<string | null>(null)
     const [showNewItemForm, setShowNewItemForm] = useState(false)
     const [editingItem, setEditingItem] = useState<any>(null)
-    const [pollInterval, setPollInterval] = useState(5000) // 5s polling
 
-    // Data fetching with polling
+    // Data fetching without polling - rely on subscriptions for real-time updates
     const { data: restaurantsData, loading: restaurantsLoading, error: restaurantsError, refetch: refetchRestaurants } = useQuery<any>(GET_MY_RESTAURANTS)
     const { data: ordersData, loading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery<any>(GET_RESTAURANT_ORDERS, {
         variables: { restaurantId: selectedRestaurantId, status: filterStatus || undefined },
         skip: !selectedRestaurantId,
-        pollInterval: pollInterval,
         fetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: false, // evita que loading=true en cada poll (sin flash)
     })
     const { data: menuData, loading: menuLoading, refetch: refetchMenu } = useQuery<any>(GET_MENU, {
         variables: { restaurantId: selectedRestaurantId },
@@ -180,11 +177,35 @@ export default function RestaurantDashboard() {
     const [deleteMenuItem] = useMutation<any>(DELETE_MENU_ITEM)
     const [toggleOpen] = useMutation<any>(TOGGLE_RESTAURANT_OPEN)
 
-    // Subscription for real-time new orders
-    const { data: newOrderData } = useSubscription<any>(RESTAURANT_ORDER_CREATED, {
-        variables: { restaurantId: selectedRestaurantId },
-        skip: !selectedRestaurantId,
-    })
+    // Manual subscriptions for real-time updates (replaces polling)
+    useEffect(() => {
+        if (!selectedRestaurantId) return
+
+        // Subscribe to new orders
+        const newOrderObservable = client.subscribe<any>({
+            query: RESTAURANT_ORDER_CREATED,
+            variables: { restaurantId: selectedRestaurantId },
+        })
+
+        const newOrderSubscription = newOrderObservable.subscribe({
+            next: ({ data }) => {
+                if (data?.restaurantOrderCreated) {
+                    const newOrder = data.restaurantOrderCreated
+                    // Prepend new order to local state
+                    setLocalOrders(prev => {
+                        const exists = prev.some(o => o.id === newOrder.id)
+                        if (exists) return prev
+                        return [newOrder, ...prev]
+                    })
+                }
+            },
+            error: (err) => console.error('[RestaurantDashboard] New order subscription error:', err)
+        })
+
+        return () => {
+            newOrderSubscription.unsubscribe()
+        }
+    }, [selectedRestaurantId, client])
 
     // useMemo prevents new array references on every render.
     // Using `|| []` directly creates a NEW [] each render → triggers all effects that depend on it.
@@ -216,18 +237,7 @@ export default function RestaurantDashboard() {
         }
     }, [ordersError])
 
-    // Handle new order from subscription — prepend to the list
-    useEffect(() => {
-        const newOrder = newOrderData?.newOrder
-        if (!newOrder) return
-        setLocalOrders(prev => {
-            const exists = prev.some(o => o.id === newOrder.id)
-            if (exists) return prev
-            return [newOrder, ...prev]
-        })
-    }, [newOrderData])
-
-    // Use localOrders for display, but keep polling for other updates
+    // Use localOrders for display (subscription handles real-time updates)
     const orders = localOrders
 
     // Auto-select first restaurant
@@ -244,9 +254,6 @@ export default function RestaurantDashboard() {
             navigate('/create-restaurant', { replace: true })
         }
     }, [restaurantsLoading, restaurantsError, restaurantsData, restaurants, navigate])
-
-    // Nota: el pollInterval del useQuery ya maneja el refresco automático.
-    // El setInterval manual fue eliminado para evitar refetches duplicados.
 
     async function handleStatusUpdate(orderId: string, newStatus: string) {
         await updateOrderStatus({ variables: { id: orderId, status: newStatus } })
@@ -462,10 +469,10 @@ export default function RestaurantDashboard() {
                                 ))}
                             </div>
 
-                            {/* Polling indicator */}
-                            <div className="flex items-center gap-2 mb-4 text-[12px] text-[var(--color-muted-foreground)]">
+                            {/* Live update indicator */}
+                            <div className="flex items-center gap-2 mb-4 text-[12px] text-green-600">
                                 <RefreshCw size={12} className="animate-spin" style={{ animationDuration: '3s' }} />
-                                <span>Actualizando cada {pollInterval / 1000}s</span>
+                                <span>Actualización en vivo</span>
                             </div>
 
                             {ordersLoading ? (

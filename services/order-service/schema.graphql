@@ -15,6 +15,8 @@ type Mutation {
 
 type Subscription {
   orderStatusChanged(orderId: ID!): Order!
+  restaurantOrderCreated(restaurantId: ID!): Order!
+  orderUpdated(orderId: ID!): Order!
 }
 
 type Order @key(fields: "id") {

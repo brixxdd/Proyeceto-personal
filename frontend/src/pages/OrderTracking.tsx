@@ -91,7 +91,7 @@ export default function OrderTracking() {
       next: ({ data }) => {
         if (data?.orderStatusChanged) {
           const updatedOrder = data.orderStatusChanged
-          
+
           // Modify cache directly - this guarantees useQuery will trigger a re-render
           client.cache.modify({
             id: client.cache.identify({ __typename: 'Order', id }),
