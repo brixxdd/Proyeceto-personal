@@ -3,7 +3,8 @@ DELIVERY PERSON (REPARTIDOR) - CHECKLIST DE IMPLEMENTACIÓN
 ================================================================================
 
 Fecha inicio: 2026-04-27
-Estado: 🚧 En desarrollo
+Última actualización: 2026-04-27
+Estado: 🚧 En desarrollo (parcialmente funcional)
 
 ================================================================================
 FASE 1: BASE (Lo más fácil)
@@ -11,20 +12,24 @@ FASE 1: BASE (Lo más fácil)
 
 [x] 1.1 Role DELIVERY_PERSON ya existe en Register.tsx
 [x] 1.2 Auth service soporta DELIVERY_PERSON role
+[x] 1.3 Repartidor dashboard page (entregas asignadas)
+       - Page: frontend/src/pages/DeliveryDashboard.tsx ✓
+       - Query: myDeliveries(deliveryPersonId) ✓
+       - Route: /delivery ✓ (agregado a App.tsx)
+       - Protección de ruta con RoleRoute ✓
+
+[x] 1.4 Confirmación de entrega (botón completado)
+       - Mutation: updateDeliveryStatus(orderId, status) ✓
+       - Estados: PENDING → ASSIGNED → PICKED_UP → IN_TRANSIT → DELIVERED
+
+[x] 1.5 Auto-creación de perfil delivery al registrarse
+       - auth-service crea delivery person profile vía GraphQL
+       - DELIVERY_SERVICE_URL configurado en docker-compose
 
 PENDIENTE:
 
-[ ] 1.3 Repartidor dashboard page (entregas asignadas)
-       - Page: frontend/src/pages/DeliveryDashboard.tsx
-       - Query: deliveryOrders (pedidos asignados al repartidor)
-       - Route: /delivery (agregar a App.tsx)
-
-[ ] 1.4 Confirmación de entrega (botón completado)
-       - Mutation: updateDeliveryStatus(orderId, status)
-       - Estados: PICKED_UP → DELIVERED
-
-[ ] 1.5 Ver detalle de pedido asignado
-       - Page: frontend/src/pages/DeliveryOrderDetail.tsx
+[ ] 1.6 Ver detalle de pedido asignado
+       - Page: frontend/src/pages/DeliveryOrderDetail.tsx (NO existe)
        - Info: dirección cliente, restaurante, items, mapa
 
 ================================================================================
@@ -47,17 +52,17 @@ FASE 2: UBICACIÓN Y MAPS
 FASE 3: REAL-TIME
 ================================================================================
 
-[ ] 3.1 Location tracking del repartidor
+[x] 3.1 Subscription myDeliveryUpdates (parcial)
+       - GraphQL subscription: myDeliveryUpdates(deliveryPersonId) ✓
+       - Funciona en DeliveryDashboard para actualizar estados en tiempo real
+
+[ ] 3.2 Location tracking del repartidor
        - WebSocket para enviar ubicación al backend
        - Guardar en Redis o DB
 
-[ ] 3.2 Notificaciones push nuevos pedidos
-       - GraphQL subscription: newDeliveryOrder
-       - Permission notification (browser)
-
 [ ] 3.3 Accept/reject pedido
-       - Mutation: acceptDeliveryOrder(orderId)
-       - Mutation: rejectDeliveryOrder(orderId)
+       - Mutation: acceptDelivery(orderId, deliveryPersonId) ✓
+       - Mutation: rejectDeliveryOrder - NO EXISTE
 
 ================================================================================
 FASE 4: VERIFICACIÓN DE ENTREGA
@@ -76,52 +81,128 @@ FASE 4: VERIFICACIÓN DE ENTREGA
        - Repartidor escanea para confirmar
 
 ================================================================================
-BACKEND REQUIREMENTS
+BACKEND REQUIREMENTS - STATUS
 ================================================================================
 
-delivery-service necesita:
+delivery-service graphql schema:
 
-1. Query: deliveryOrders(deliveryPersonId)
-   - Pedidos asignados a este repartidor con status relevante
+[x] Query: myDeliveries(deliveryPersonId) ✓
+[x] Query: myDeliveryPerson(userId) ✓
+[x] Query: delivery(id) ✓
+[x] Query: availableDrivers ✓
 
-2. Query: deliveryOrder(id)
-   - Detalle completo de un pedido asignado
+[x] Mutation: createDeliveryPerson(userId, name, vehicleType) ✓
+[x] Mutation: updateDriverStatus(id, status, location) ✓
+[x] Mutation: updateDeliveryStatus(id, status) ✓
+[x] Mutation: acceptDelivery(orderId, deliveryPersonId) ✓
 
-3. Mutation: updateDeliveryStatus(orderId, status, photoUrl?, signature?)
-   - Cambiar estado: PENDING_ASSIGNMENT → ASSIGNED → PICKED_UP → DELIVERED
+[x] Subscription: myDeliveryUpdates(deliveryPersonId) ✓
+[x] Subscription: deliveryStatusChanged(deliveryId) ✓
 
-4. Mutation: acceptDeliveryOrder(orderId, deliveryPersonId)
-   - Asignarse un pedido disponible
-
-5. Mutation: rejectDeliveryOrder(orderId)
-   - Rechazar pedido asignado
-
-6. Subscription: newDeliveryOrder(deliveryPersonId)
-   - Notificar cuando se asigna nuevo pedido
-
-7. Subscription: orderStatusChanged(orderId)
-   - Tracking de cambios mientras entrega
-
-8. Mutation: updateLocation(deliveryPersonId, lat, lng)
-   - Actualizar ubicación en tiempo real
+PENDIENTE:
+[ ] Mutation: rejectDeliveryOrder(orderId, deliveryPersonId)
+[ ] Query: deliveryOrderDetails(orderId) - incluir info de restaurante/cliente
 
 ================================================================================
-FRONTEND PAGES
+FRONTEND PAGES - STATUS
 ================================================================================
 
-/delivery                  → DeliveryDashboard (lista de pedidos)
-/delivery/orders/:id       → DeliveryOrderDetail (detalle + mapa)
+[x] /delivery → DeliveryDashboard.tsx (FUNCIONAL)
+[ ] /delivery/orders/:id → DeliveryOrderDetail.tsx (NO EXISTE)
+
+================================================================================
+NAVEGACIÓN PROTEGIDA - STATUS
+================================================================================
+
+[x] /delivery → solo DELIVERY_PERSON (redirige a /restaurants si no)
+[x] /dashboard → solo RESTAURANT_OWNER, ADMIN (redirige a /restaurants si no)
+[x] /orders → CUSTOMER, RESTAURANT_OWNER, ADMIN (redirige a /delivery si DELIVERY_PERSON)
+[x] /cart → solo CUSTOMER (redirige a /delivery si DELIVERY_PERSON)
+[x] /checkout → solo CUSTOMER (redirige a /delivery si DELIVERY_PERSON)
 
 ================================================================================
 ORDEN RECOMENDADO DE IMPLEMENTACIÓN
 ================================================================================
 
-1. [ ] delivery-service: Queries y mutations básicas
-2. [ ] DeliveryDashboard.tsx: Lista de pedidos
-3. [ ] DeliveryOrderDetail.tsx: Detalle
-4. [ ] Botón "Marcar como entregado"
+1. [x] delivery-service: Queries y mutations básicas ✓
+2. [x] DeliveryDashboard.tsx: Lista de pedidos ✓
+3. [ ] DeliveryOrderDetail.tsx: Detalle + mapa (PENDIENTE)
+4. [x] Botón "Marcar como entregado" ✓
 5. [ ] Integración mapa (Google Maps)
 6. [ ] Location tracking
 7. [ ] Notificaciones push
+8. [ ] rejectDeliveryOrder mutation
+
+================================================================================
+PENDIENTE MAÑANA: ACEPTAR PEDIDOS DESDE DELIVERY DASHBOARD
+================================================================================
+
+Contexto:
+- Hay pedidos en status READY/CONFIRMED sin delivery_person_id asignado
+- El delivery person necesita ver pedidos disponibles y aceptarlos
+- currently myDeliveries solo muestra pedidos YA asignados
+
+FLUJO PLANEADO:
+1. order-service publica evento "order.ready" a Kafka cuando pedido pasa a READY
+2. delivery-service consume el evento y crea delivery record automáticamente
+3. El delivery person ve los pedidos disponibles en su dashboard
+4. Puede hacer acceptDelivery(deliveryId) para asignarse el pedido
+
+ARCHIVOS A TOCAR:
+
+Backend:
+- order-service/src/events/kafka.producer.ts → agregar publishOrderReady()
+- order-service/src/index.ts → publicar evento cuando order pasa a READY
+- order-service/src/services/order.service.ts → llamar publishOrderReady
+- delivery-service/src/events/kafka.consumer.ts → consumir order.ready, crear delivery
+- delivery-service/schema.graphql → agregar query availableDeliveries
+- delivery-service/src/resolvers/delivery.resolver.ts → resolver availableDeliveries
+- delivery-service/src/services/delivery.service.ts → método getAvailableDeliveriesForDriver
+- delivery-service/src/repositories/delivery.repository.ts → findAvailableDeliveries
+
+Frontend:
+- frontend/src/pages/DeliveryDashboard.tsx → mostrar sección "Pedidos Disponibles"
+- Agregar sección de pedidos pendientes de aceptar
+- Mutation acceptDelivery en frontend
+
+TOPICS KAFKA NECESARIOS:
+- order.ready (nuevo topic)
+
+DATOS ACTUALES EN BD:
+- Pedidos READY sin delivery_person_id:
+  - 2b6b4d82-c759-4d1e-85e7-e4b67d6da9bd (customer a0000000-0000-0000-0000-000000000004, restaurant b0000000-0000-0000-0000-000000000002)
+  - f5e667e7-6471-4ecd-aecf-add1c903c815
+  - b60ce83d-8547-4cc7-9838-85dc195b904f
+  - e8c979a8-6311-4e44-aade-4d5094c755af
+  - y más...
+
+RESTAURANTES:
+- b0000000-0000-0000-0000-000000000001 (Tacos El Güero)
+- b0000000-0000-0000-0000-000000000002 (Sushi Nagoya)
+
+================================================================================
+
+1. [x] delivery-service: Queries y mutations básicas ✓
+2. [x] DeliveryDashboard.tsx: Lista de pedidos ✓
+3. [ ] DeliveryOrderDetail.tsx: Detalle + mapa (PENDIENTE)
+4. [x] Botón "Marcar como entregado" ✓
+5. [ ] Integración mapa (Google Maps)
+6. [ ] Location tracking
+7. [ ] Notificaciones push
+8. [ ] rejectDeliveryOrder mutation
+
+================================================================================
+TEST CREDENTIALS
+================================================================================
+
+Email: testdriver@test.com
+Password: Test1234!
+Role: DELIVERY_PERSON
+Delivery Person ID: f96c7a03-7e41-47a3-97aa-026420c22835
+
+Email: driver2@test.com
+Password: Test1234!
+Role: DELIVERY_PERSON
+Delivery Person ID: b202fdd7-cf77-489c-9bee-de064716aebe
 
 ================================================================================
