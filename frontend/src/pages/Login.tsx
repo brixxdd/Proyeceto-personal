@@ -38,6 +38,8 @@ export default function Login() {
           const role = data.login.user?.role
           if (role === 'RESTAURANT_OWNER' || role === 'ADMIN') {
             navigate('/dashboard')
+          } else if (role === 'DELIVERY_PERSON') {
+            navigate('/delivery')
           } else {
             navigate('/restaurants')
           }

@@ -6,20 +6,26 @@ type Query {
   deliveries(orderId: ID, status: DeliveryStatus): [Delivery!]!
   availableDrivers: [DeliveryPerson!]!
   deliveryPerson(id: ID!): DeliveryPerson
+  myDeliveries(deliveryPersonId: ID!): [Delivery!]!
+  myDeliveryPerson(userId: ID!): DeliveryPerson
 }
 
 type Mutation {
+  createDeliveryPerson(userId: ID!, name: String!, vehicleType: VehicleType!): DeliveryPerson!
   updateDriverStatus(id: ID!, status: DriverStatus!, location: LocationInput): DeliveryPerson!
   updateDeliveryStatus(id: ID!, status: DeliveryStatus!): Delivery!
+  acceptDelivery(orderId: ID!, deliveryPersonId: ID!): Delivery!
 }
 
 type Subscription {
   deliveryStatusChanged(deliveryId: ID!): Delivery!
   driverAssigned(orderId: ID!): Delivery!
+  myDeliveryUpdates(deliveryPersonId: ID!): Delivery!
 }
 
 type DeliveryPerson @key(fields: "id") {
   id: ID!
+  userId: String
   name: String!
   status: DriverStatus!
   currentLocation: Location

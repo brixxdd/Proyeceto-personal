@@ -40,6 +40,8 @@ export default function Register() {
     } else {
       if (form.role === 'RESTAURANT_OWNER') {
         navigate('/dashboard')
+      } else if (form.role === 'DELIVERY_PERSON') {
+        navigate('/delivery')
       } else {
         navigate('/restaurants')
       }

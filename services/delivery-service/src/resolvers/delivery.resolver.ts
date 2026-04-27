@@ -1,5 +1,5 @@
 import { DeliveryService } from '../services/delivery.service';
-import { RedisPubSub, deliveryStatusChannel, driverAssignedChannel } from '../pubsub/redis.pubsub';
+import { RedisPubSub, deliveryStatusChannel, driverAssignedChannel, myDeliveryUpdatesChannel } from '../pubsub/redis.pubsub';
 import { DeliveryStatus, DriverStatus, Location } from '../models/delivery.model';
 import { AuthContext } from '../middleware/auth';
 
@@ -48,7 +48,31 @@ export class DeliveryResolver {
     return this.deliveryService.getDeliveryPersonById(args.id);
   }
 
+  async getMyDeliveryPerson(
+    _parent: unknown,
+    args: { userId: string },
+    _ctx: ResolverContext,
+  ) {
+    return this.deliveryService.getDeliveryPersonByUserId(args.userId);
+  }
+
+  async getMyDeliveries(
+    _parent: unknown,
+    args: { deliveryPersonId: string },
+    _ctx: ResolverContext,
+  ) {
+    return this.deliveryService.getMyDeliveries(args.deliveryPersonId);
+  }
+
   // ── Mutations ─────────────────────────────────────────────────────────────
+
+  async createDeliveryPerson(
+    _parent: unknown,
+    args: { userId: string; name: string; vehicleType: 'BICYCLE' | 'MOTORCYCLE' | 'CAR' },
+    _ctx: ResolverContext,
+  ) {
+    return this.deliveryService.createDeliveryPerson(args.userId, args.name, args.vehicleType);
+  }
 
   async updateDriverStatus(
     _parent: unknown,
@@ -64,6 +88,14 @@ export class DeliveryResolver {
     _ctx: ResolverContext,
   ) {
     return this.deliveryService.updateDeliveryStatus(args.id, args.status);
+  }
+
+  async acceptDelivery(
+    _parent: unknown,
+    args: { orderId: string; deliveryPersonId: string },
+    _ctx: ResolverContext,
+  ) {
+    return this.deliveryService.acceptDelivery(args.orderId, args.deliveryPersonId);
   }
 
   // ── Subscriptions ─────────────────────────────────────────────────────────
@@ -82,5 +114,13 @@ export class DeliveryResolver {
     ctx: ResolverContext,
   ) {
     return ctx.pubSub.asyncIterator(driverAssignedChannel(args.orderId));
+  }
+
+  subscribeToMyDeliveryUpdates(
+    _parent: unknown,
+    args: { deliveryPersonId: string },
+    ctx: ResolverContext,
+  ) {
+    return ctx.pubSub.asyncIterator(myDeliveryUpdatesChannel(args.deliveryPersonId));
   }
 }

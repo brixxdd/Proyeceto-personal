@@ -232,6 +232,7 @@ services:
       JWT_EXPIRES_IN: 1h
       JWT_REFRESH_SECRET: 8b5d3a2e7c4146a81d11b33948e65a0b943d6342
       JWT_REFRESH_EXPIRES_IN: 7d
+      DELIVERY_SERVICE_URL: http://delivery-service:3003/graphql
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       SERVICE_NAME: auth-service
     ports:
@@ -254,6 +255,7 @@ services:
       AUTH_SERVICE_URL: http://auth-service:3002/graphql
       RESTAURANT_SERVICE_URL: http://restaurant-service:3001/graphql
       ORDER_SERVICE_URL: http://order-service:3000/graphql
+      DELIVERY_SERVICE_URL: http://delivery-service:3003/graphql
       ORDER_SERVICE_WS_URL: ws://order-service:3000/graphql
       REDIS_URL: redis://redis:6379
       JWT_SECRET: e4b51c89f212267b2d56a3e264024b898f98a280

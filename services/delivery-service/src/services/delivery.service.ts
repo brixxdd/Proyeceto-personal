@@ -1,7 +1,7 @@
-import { Delivery, DeliveryPerson, DeliveryStatus, DriverStatus, Location } from '../models/delivery.model';
+import { Delivery, DeliveryPerson, DeliveryStatus, DriverStatus, Location, VehicleType } from '../models/delivery.model';
 import { DeliveryRepository } from '../repositories/delivery.repository';
 import { KafkaProducer } from '../events/kafka.producer';
-import { RedisPubSub, deliveryStatusChannel, driverAssignedChannel } from '../pubsub/redis.pubsub';
+import { RedisPubSub, deliveryStatusChannel, driverAssignedChannel, myDeliveryUpdatesChannel } from '../pubsub/redis.pubsub';
 import { logger } from '../utils/logger';
 import { deliveryAssignmentsTotal, activeDeliveries, availableDrivers } from '../metrics/prometheus';
 
@@ -86,6 +86,7 @@ export class DeliveryService {
 
     // Publish GraphQL subscription event
     await this.pubSub.publish(deliveryStatusChannel(id), delivery);
+    await this.pubSub.publish(myDeliveryUpdatesChannel(delivery.deliveryPersonId), delivery);
 
     // When delivered, release the driver
     if (status === 'DELIVERED') {
@@ -122,14 +123,56 @@ export class DeliveryService {
     return this.repo.findDeliveryById(id);
   }
 
+  async getDeliveryPersonById(id: string): Promise<DeliveryPerson | null> {
+    return this.repo.findDeliveryPersonById(id);
+  }
+
+  async getDeliveryPersonByUserId(userId: string): Promise<DeliveryPerson | null> {
+    return this.repo.findDeliveryPersonByUserId(userId);
+  }
+
+  async createDeliveryPerson(
+    userId: string,
+    name: string,
+    vehicleType: VehicleType,
+  ): Promise<DeliveryPerson> {
+    return this.repo.createDeliveryPerson({ userId, name, vehicleType });
+  }
+
+  async getMyDeliveries(deliveryPersonId: string): Promise<Delivery[]> {
+    return this.repo.findDeliveries({ deliveryPersonId });
+  }
+
+  async acceptDelivery(deliveryId: string, deliveryPersonId: string): Promise<Delivery> {
+    const delivery = await this.repo.findDeliveryById(deliveryId);
+    if (!delivery) {
+      throw new Error(`Delivery ${deliveryId} not found`);
+    }
+    if (delivery.status !== 'PENDING') {
+      throw new Error(`Delivery ${deliveryId} is not available for acceptance`);
+    }
+
+    const updated = await this.repo.updateDelivery({
+      id: deliveryId,
+      deliveryPersonId,
+      status: 'ASSIGNED',
+    });
+
+    if (!updated) {
+      throw new Error(`Failed to accept delivery ${deliveryId}`);
+    }
+
+    await this.repo.updateDriverStatus(deliveryPersonId, 'BUSY');
+    await this.pubSub.publish(deliveryStatusChannel(deliveryId), updated);
+
+    return updated;
+  }
+
   async getDeliveries(filters: {
     orderId?: string;
     status?: DeliveryStatus;
+    deliveryPersonId?: string;
   }): Promise<Delivery[]> {
     return this.repo.findDeliveries(filters);
-  }
-
-  async getDeliveryPersonById(id: string): Promise<DeliveryPerson | null> {
-    return this.repo.findDeliveryPersonById(id);
   }
 }

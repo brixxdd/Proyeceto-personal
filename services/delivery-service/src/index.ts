@@ -85,10 +85,14 @@ const resolvers = {
     deliveries: deliveryResolver.getDeliveries.bind(deliveryResolver),
     availableDrivers: deliveryResolver.getAvailableDrivers.bind(deliveryResolver),
     deliveryPerson: deliveryResolver.getDeliveryPerson.bind(deliveryResolver),
+    myDeliveryPerson: deliveryResolver.getMyDeliveryPerson.bind(deliveryResolver),
+    myDeliveries: deliveryResolver.getMyDeliveries.bind(deliveryResolver),
   },
   Mutation: {
+    createDeliveryPerson: deliveryResolver.createDeliveryPerson.bind(deliveryResolver),
     updateDriverStatus: deliveryResolver.updateDriverStatus.bind(deliveryResolver),
     updateDeliveryStatus: deliveryResolver.updateDeliveryStatus.bind(deliveryResolver),
+    acceptDelivery: deliveryResolver.acceptDelivery.bind(deliveryResolver),
   },
   Subscription: {
     deliveryStatusChanged: {
@@ -97,6 +101,10 @@ const resolvers = {
     },
     driverAssigned: {
       subscribe: deliveryResolver.subscribeToDriverAssigned.bind(deliveryResolver),
+      resolve: (payload: unknown) => payload,
+    },
+    myDeliveryUpdates: {
+      subscribe: deliveryResolver.subscribeToMyDeliveryUpdates.bind(deliveryResolver),
       resolve: (payload: unknown) => payload,
     },
   },

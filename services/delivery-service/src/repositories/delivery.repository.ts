@@ -7,6 +7,7 @@ import {
   DeliveryStatus,
   DriverStatus,
   Location,
+  VehicleType,
   mapDelivery,
   mapDeliveryPerson,
 } from '../models/delivery.model';
@@ -25,8 +26,16 @@ export class DeliveryRepository {
     return mapDeliveryPerson(result.rows[0]);
   }
 
+  async findDeliveryPersonByUserId(userId: string): Promise<DeliveryPerson | null> {
+    const result = await this.pool.query<DeliveryPersonRow>(
+      'SELECT * FROM delivery_people WHERE user_id = $1',
+      [userId],
+    );
+    if (result.rows.length === 0) return null;
+    return mapDeliveryPerson(result.rows[0]);
+  }
+
   async findAvailableDriver(): Promise<DeliveryPerson | null> {
-    // Pick a random AVAILABLE driver — ORDER BY RANDOM() is fine for city-scale tables.
     const result = await this.pool.query<DeliveryPersonRow>(
       "SELECT * FROM delivery_people WHERE status = 'AVAILABLE' ORDER BY RANDOM() LIMIT 1",
     );
@@ -82,6 +91,7 @@ export class DeliveryRepository {
   async findDeliveries(filters: {
     orderId?: string;
     status?: DeliveryStatus;
+    deliveryPersonId?: string;
   }): Promise<Delivery[]> {
     const conditions: string[] = [];
     const values: unknown[] = [];
@@ -94,6 +104,10 @@ export class DeliveryRepository {
     if (filters.status) {
       conditions.push(`status = $${idx++}`);
       values.push(filters.status);
+    }
+    if (filters.deliveryPersonId) {
+      conditions.push(`delivery_person_id = $${idx++}`);
+      values.push(filters.deliveryPersonId);
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -149,5 +163,35 @@ export class DeliveryRepository {
       "SELECT COUNT(*) AS count FROM delivery_people WHERE status = 'AVAILABLE'",
     );
     return parseInt(result.rows[0].count, 10);
+  }
+
+  async createDeliveryPerson(data: {
+    userId: string;
+    name: string;
+    vehicleType: VehicleType;
+  }): Promise<DeliveryPerson> {
+    const result = await this.pool.query<DeliveryPersonRow>(
+      `INSERT INTO delivery_people (user_id, name, vehicle_type)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [data.userId, data.name, data.vehicleType],
+    );
+    return mapDeliveryPerson(result.rows[0]);
+  }
+
+  async updateDelivery(data: {
+    id: string;
+    deliveryPersonId: string;
+    status: DeliveryStatus;
+  }): Promise<Delivery | null> {
+    const result = await this.pool.query<DeliveryRow>(
+      `UPDATE deliveries
+       SET delivery_person_id = $2, status = $3, updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [data.id, data.deliveryPersonId, data.status],
+    );
+    if (result.rows.length === 0) return null;
+    return mapDelivery(result.rows[0]);
   }
 }

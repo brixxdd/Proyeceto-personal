@@ -85,3 +85,6 @@ export const deliveryStatusChannel = (deliveryId: string) => `delivery:status:${
 
 /** Channel name for driver assignment events */
 export const driverAssignedChannel = (orderId: string) => `delivery:driver-assigned:${orderId}`;
+
+/** Channel for a delivery person's assigned deliveries updates */
+export const myDeliveryUpdatesChannel = (deliveryPersonId: string) => `delivery:my-updates:${deliveryPersonId}`;

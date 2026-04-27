@@ -71,13 +71,14 @@ function setupRateLimiter(redis: any) {
   return rateLimit(options);
 }
 
-// Configure Apollo Gateway with all 3 subgraphs
+// Configure Apollo Gateway with all 4 subgraphs
 const gateway = new ApolloGateway({
   supergraphSdl: new IntrospectAndCompose({
     subgraphs: [
       { name: 'auth', url: process.env.AUTH_SERVICE_URL || 'http://localhost:3002/graphql' },
       { name: 'restaurant', url: process.env.RESTAURANT_SERVICE_URL || 'http://localhost:3001/graphql' },
       { name: 'order', url: process.env.ORDER_SERVICE_URL || 'http://localhost:3000/graphql' },
+      { name: 'delivery', url: process.env.DELIVERY_SERVICE_URL || 'http://localhost:3003/graphql' },
     ],
   }),
   buildService({ name, url }) {

@@ -5,6 +5,8 @@ import { logger } from '../utils/logger';
 
 const SALT_ROUNDS = 12;
 
+const DELIVERY_SERVICE_URL = process.env.DELIVERY_SERVICE_URL || 'http://localhost:3003/graphql';
+
 export interface CreateUserInput {
   email: string;
   password: string;
@@ -82,6 +84,10 @@ export class AuthService {
       await client.query('COMMIT');
 
       logger.info('User created successfully', { userId: user.id, email: user.email });
+
+      if (input.role === 'DELIVERY_PERSON') {
+        await this.createDeliveryPersonProfile(user.id, user.name);
+      }
 
       return {
         token,
@@ -174,5 +180,36 @@ export class AuthService {
       createdAt: user.created_at.toISOString(),
       updatedAt: user.updated_at.toISOString(),
     };
+  }
+
+  private async createDeliveryPersonProfile(userId: string, name: string): Promise<void> {
+    try {
+      const response = await fetch(DELIVERY_SERVICE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `
+            mutation CreateDeliveryPerson($userId: ID!, $name: String!, $vehicleType: VehicleType!) {
+              createDeliveryPerson(userId: $userId, name: $name, vehicleType: $vehicleType) {
+                id
+              }
+            }
+          `,
+          variables: {
+            userId,
+            name,
+            vehicleType: 'MOTORCYCLE',
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        logger.error('Failed to create delivery person profile', { userId, status: response.status });
+      } else {
+        logger.info('Delivery person profile created', { userId });
+      }
+    } catch (error) {
+      logger.error('Error creating delivery person profile', { userId, error: String(error) });
+    }
   }
 }

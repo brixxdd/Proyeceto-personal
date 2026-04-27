@@ -46,6 +46,7 @@ export default function Navbar() {
   const { itemCount } = useCart()
 
   const isOwner = role === 'RESTAURANT_OWNER' || role === 'ADMIN'
+  const isDelivery = role === 'DELIVERY_PERSON'
 
   function handleLogout() {
     sessionStorage.removeItem('token')
@@ -163,9 +164,15 @@ export default function Navbar() {
         {/* Desktop main nav — role-aware */}
         <div className="hidden md:flex items-center gap-1">
           <NavLink to="/" icon={Home} label="Inicio" active={pathname === '/'} />
-          <NavLink to="/restaurants" icon={UtensilsCrossed} label="Explorar" active={pathname.startsWith('/restaurants') || pathname.startsWith('/restaurant')} />
-          <NavLink to={ordersLink} icon={isOwner ? LayoutDashboard : ShoppingBag} label={isOwner ? 'Dashboard' : 'Pedidos'} active={pathname === ordersLink || (isOwner && pathname.startsWith('/dashboard'))} />
-          {!isOwner && <NavLink to="/cart" icon={ShoppingCart} label="Carrito" active={pathname === '/cart'} badge={itemCount > 0 ? itemCount : undefined} />}
+          {isDelivery ? (
+            <NavLink to="/delivery" icon={LayoutDashboard} label="Entregas" active={pathname.startsWith('/delivery')} />
+          ) : (
+            <>
+              <NavLink to="/restaurants" icon={UtensilsCrossed} label="Explorar" active={pathname.startsWith('/restaurants') || pathname.startsWith('/restaurant')} />
+              <NavLink to={ordersLink} icon={isOwner ? LayoutDashboard : ShoppingBag} label={isOwner ? 'Dashboard' : 'Pedidos'} active={pathname === ordersLink || (isOwner && pathname.startsWith('/dashboard'))} />
+              {!isOwner && <NavLink to="/cart" icon={ShoppingCart} label="Carrito" active={pathname === '/cart'} badge={itemCount > 0 ? itemCount : undefined} />}
+            </>
+          )}
           <NavLink to="/profile" icon={User} label="Perfil" active={pathname === '/profile'} />
         </div>
 
@@ -187,7 +194,7 @@ export default function Navbar() {
         {/* Mobile right */}
         <div className="flex md:hidden items-center gap-2">
           <ThemeToggle />
-          {!isOwner && itemCount > 0 && (
+          {!isOwner && !isDelivery && itemCount > 0 && (
             <Link
               to="/cart"
               className="relative w-9 h-9 flex items-center justify-center rounded-xl"
@@ -201,11 +208,11 @@ export default function Navbar() {
             </Link>
           )}
           <Link
-            to="/restaurants"
+            to={isDelivery ? '/delivery' : '/restaurants'}
             className="w-9 h-9 flex items-center justify-center rounded-xl"
             style={{ backgroundColor: 'var(--color-muted)', color: 'var(--color-foreground)' }}
           >
-            <UtensilsCrossed size={18} />
+            {isDelivery ? <LayoutDashboard size={18} /> : <UtensilsCrossed size={18} />}
           </Link>
         </div>
       </div>

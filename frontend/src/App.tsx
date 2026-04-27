@@ -33,6 +33,7 @@ const LazyCart = lazy(() => import('./pages/Cart'))
 const LazyCheckout = lazy(() => import('./pages/Checkout'))
 const LazyRestaurantDashboard = lazy(() => import('./pages/RestaurantDashboard'))
 const LazyCreateRestaurant = lazy(() => import('./pages/CreateRestaurant'))
+const LazyDeliveryDashboard = lazy(() => import('./pages/DeliveryDashboard'))
 
 /**
  * Skeleton fallback while lazy-loaded chunk is fetching
@@ -95,9 +96,11 @@ export default function App() {
                     path="/orders"
                     element={
                       <ProtectedRoute>
-                        <Suspense fallback={<OrdersSkeleton />}>
-                          <LazyOrders />
-                        </Suspense>
+                        <RoleRoute allowedRoles="CUSTOMER,RESTAURANT_OWNER,ADMIN" redirectTo="/delivery">
+                          <Suspense fallback={<OrdersSkeleton />}>
+                            <LazyOrders />
+                          </Suspense>
+                        </RoleRoute>
                       </ProtectedRoute>
                     }
                   />
@@ -106,9 +109,11 @@ export default function App() {
                     path="/orders/:id"
                     element={
                       <ProtectedRoute>
-                        <Suspense fallback={<PageSkeleton />}>
-                          <LazyOrderTracking />
-                        </Suspense>
+                        <RoleRoute allowedRoles="CUSTOMER,RESTAURANT_OWNER,ADMIN" redirectTo="/delivery">
+                          <Suspense fallback={<PageSkeleton />}>
+                            <LazyOrderTracking />
+                          </Suspense>
+                        </RoleRoute>
                       </ProtectedRoute>
                     }
                   />
@@ -128,9 +133,11 @@ export default function App() {
                     path="/cart"
                     element={
                       <ProtectedRoute>
-                        <Suspense fallback={<PageSkeleton />}>
-                          <LazyCart />
-                        </Suspense>
+                        <RoleRoute allowedRoles="CUSTOMER" redirectTo="/delivery">
+                          <Suspense fallback={<PageSkeleton />}>
+                            <LazyCart />
+                          </Suspense>
+                        </RoleRoute>
                       </ProtectedRoute>
                     }
                   />
@@ -139,9 +146,11 @@ export default function App() {
                     path="/checkout"
                     element={
                       <ProtectedRoute>
-                        <Suspense fallback={<PageSkeleton />}>
-                          <LazyCheckout />
-                        </Suspense>
+                        <RoleRoute allowedRoles="CUSTOMER" redirectTo="/delivery">
+                          <Suspense fallback={<PageSkeleton />}>
+                            <LazyCheckout />
+                          </Suspense>
+                        </RoleRoute>
                       </ProtectedRoute>
                     }
                   />
@@ -166,6 +175,19 @@ export default function App() {
                         <RoleRoute allowedRoles="RESTAURANT_OWNER,ADMIN" redirectTo="/restaurants">
                           <Suspense fallback={<PageSkeleton />}>
                             <LazyCreateRestaurant />
+                          </Suspense>
+                        </RoleRoute>
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/delivery"
+                    element={
+                      <ProtectedRoute>
+                        <RoleRoute allowedRoles="DELIVERY_PERSON" redirectTo="/restaurants">
+                          <Suspense fallback={<PageSkeleton />}>
+                            <LazyDeliveryDashboard />
                           </Suspense>
                         </RoleRoute>
                       </ProtectedRoute>

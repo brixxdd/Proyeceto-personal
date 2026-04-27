@@ -9,6 +9,7 @@ export type VehicleType = 'BICYCLE' | 'MOTORCYCLE' | 'CAR';
 
 export interface DeliveryPerson {
   id: string;
+  userId: string | null;
   name: string;
   status: DriverStatus;
   currentLocation: Location | null;
@@ -33,6 +34,7 @@ export interface Delivery {
 /** Row as returned by pg (snake_case) */
 export interface DeliveryPersonRow {
   id: string;
+  user_id: string | null;
   name: string;
   status: string;
   current_location: Location | null;
@@ -57,6 +59,7 @@ export interface DeliveryRow {
 export function mapDeliveryPerson(row: DeliveryPersonRow): DeliveryPerson {
   return {
     id: row.id,
+    userId: row.user_id,
     name: row.name,
     status: row.status as DriverStatus,
     currentLocation: row.current_location,

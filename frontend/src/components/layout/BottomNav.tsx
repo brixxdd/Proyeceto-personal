@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, UtensilsCrossed, ShoppingBag, User, ShoppingCart, LayoutDashboard } from 'lucide-react'
+import { Home, UtensilsCrossed, ShoppingBag, User, ShoppingCart, LayoutDashboard, Bike } from 'lucide-react'
 import { useCart } from '../../context/CartContext'
 
 const TABS = [
@@ -16,10 +16,13 @@ export default function BottomNav() {
 
   const showProfile = !!token
   const isOwner = role === 'RESTAURANT_OWNER' || role === 'ADMIN'
+  const isDelivery = role === 'DELIVERY_PERSON'
 
-  // Owner sees orders dashboard, regular users see /orders
+  // Owner sees orders dashboard, delivery person sees their dashboard, regular users see /orders
   const mainTab = isOwner
     ? { to: '/dashboard', icon: LayoutDashboard, label: 'Pedidos' }
+    : isDelivery
+    ? { to: '/delivery', icon: Bike, label: 'Entregas' }
     : { to: '/orders', icon: ShoppingBag, label: 'Pedidos' }
 
   return (
@@ -111,8 +114,8 @@ export default function BottomNav() {
         )
       })()}
 
-      {/* Cart tab (non-owner only) */}
-      {!isOwner && (
+      {/* Cart tab (non-owner and non-delivery only) */}
+      {!isOwner && !isDelivery && (
         <Link
           to="/cart"
           aria-current={pathname === '/cart' ? 'page' : undefined}
