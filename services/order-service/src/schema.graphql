@@ -1,6 +1,7 @@
 type Query {
   orders(status: OrderStatus, limit: Int, offset: Int): [Order!]!
   order(id: ID!): Order
+  restaurantOrders(restaurantId: ID!, status: OrderStatus, limit: Int, offset: Int): [Order!]!
 }
 
 type Mutation {
@@ -32,6 +33,7 @@ type Order {
 type OrderItem {
   id: ID!
   menuItemId: ID!
+  name: String
   quantity: Int!
   price: Float!
   subtotal: Float!

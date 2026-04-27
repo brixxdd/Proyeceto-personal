@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { useQuery, useMutation } from '@apollo/client/react'
+import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Minus, ShoppingCart, ArrowLeft, Star, Clock } from 'lucide-react'
@@ -18,21 +18,7 @@ const GET_RESTAURANT = gql`
   }
 `
 
-const CREATE_ORDER = gql`
-  mutation CreateOrder($input: CreateOrderInput!) {
-    createOrder(input: $input) {
-      id status totalAmount
-    }
-  }
-`
-
-const DEFAULT_ADDRESS = {
-  street: 'Calle Demo 123',
-  city: 'Ciudad de México',
-  state: 'CDMX',
-  zipCode: '06600',
-  country: 'México',
-}
+// Order creation happens in /checkout — not here.
 
 interface MenuItem {
   id: string
@@ -70,7 +56,6 @@ export default function RestaurantDetail() {
   const location = useLocation()
   const { addItem, removeItem, items, itemCount, total, restaurantId } = useCart()
   const { data, loading, error } = useQuery<any>(GET_RESTAURANT, { variables: { id } })
-  const [createOrder, { loading: ordering }] = useMutation(CREATE_ORDER)
 
   // Get quantity of specific menu item in cart
   function getItemQuantity(menuItemId: string) {
@@ -81,20 +66,11 @@ export default function RestaurantDetail() {
   const cartCount = (restaurantId === id || !restaurantId) ? itemCount : 0
   const cartTotal = (restaurantId === id || !restaurantId) ? total : 0
 
-  async function handleOrder() {
-    if (!sessionStorage.getItem('token')) { navigate('/login'); return }
-    if (!id) return
-    try {
-      const cartItems = items
-        .filter(i => i.restaurantId === id)
-        .map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity }))
-      if (cartItems.length === 0) return
-      const result = await createOrder({ variables: { input: { restaurantId: id, items: cartItems, deliveryAddress: DEFAULT_ADDRESS } } })
-      navigate(`/orders/${(result.data as any).createOrder.id}`)
-    } catch (err: any) {
-      console.error(err)
-      alert(err.message || 'Error al procesar el pedido')
-    }
+  function handleOrder() {
+    if (!sessionStorage.getItem('token')) { navigate('/login', { state: { from: location.pathname } }); return }
+    if (itemCount === 0) return
+    // Navigate to checkout — order creation and address input happen there
+    navigate('/checkout')
   }
 
   function handleAddToCart(menuItem: MenuItem, restaurantName: string) {
@@ -308,17 +284,16 @@ export default function RestaurantDetail() {
               <div className="absolute inset-0 top-6 -mb-6 bg-white blur-xl opacity-60 rounded-full" />
               <motion.button
                 onClick={handleOrder}
-                disabled={ordering}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.96 }}
                 transition={bouncyTransition}
-                className="relative w-full flex items-center justify-between px-6 py-5 rounded-[24px] text-white font-bold cursor-pointer disabled:opacity-60 bg-[var(--color-primary)] ios-shadow-lg"
+                className="relative w-full flex items-center justify-between px-6 py-5 rounded-[24px] text-white font-bold cursor-pointer bg-[var(--color-primary)] ios-shadow-lg"
               >
                 <span className="flex items-center gap-2.5 text-[16px]">
                   <ShoppingCart size={20} strokeWidth={2.5} />
                   {cartCount} {cartCount === 1 ? 'item' : 'items'}
                 </span>
-                <span className="text-[16px] tracking-tight">{ordering ? 'Ordenando...' : `Pedir · $${cartTotal.toFixed(2)}`}</span>
+                <span className="text-[16px] tracking-tight">{`Ir a pagar · $${cartTotal.toFixed(2)}`}</span>
               </motion.button>
             </motion.div>
           )}

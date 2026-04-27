@@ -75,17 +75,47 @@ const UPDATE_ORDER_STATUS = gql`
   }
 `
 
+// createMenuItem uses flat args (no input type) — matches restaurant-service schema
 const CREATE_MENU_ITEM = gql`
-  mutation CreateMenuItem($restaurantId: ID!, $input: CreateMenuItemInput!) {
-    createMenuItem(restaurantId: $restaurantId, input: $input) {
+  mutation CreateMenuItem(
+    $restaurantId: ID!
+    $name: String!
+    $description: String
+    $price: Float!
+    $category: String
+    $isAvailable: Boolean
+  ) {
+    createMenuItem(
+      restaurantId: $restaurantId
+      name: $name
+      description: $description
+      price: $price
+      category: $category
+      isAvailable: $isAvailable
+    ) {
       id name price isAvailable
     }
   }
 `
 
+// updateMenuItem also uses flat args
 const UPDATE_MENU_ITEM = gql`
-  mutation UpdateMenuItem($id: ID!, $input: UpdateMenuItemInput!) {
-    updateMenuItem(id: $id, input: $input) { id name price isAvailable }
+  mutation UpdateMenuItem(
+    $id: ID!
+    $name: String
+    $description: String
+    $price: Float
+    $category: String
+    $isAvailable: Boolean
+  ) {
+    updateMenuItem(
+      id: $id
+      name: $name
+      description: $description
+      price: $price
+      category: $category
+      isAvailable: $isAvailable
+    ) { id name price isAvailable }
   }
 `
 
@@ -95,9 +125,10 @@ const DELETE_MENU_ITEM = gql`
   }
 `
 
+// updateRestaurant also uses flat args — no `input` wrapper
 const TOGGLE_RESTAURANT_OPEN = gql`
   mutation ToggleRestaurantOpen($id: ID!, $isOpen: Boolean!) {
-    updateRestaurant(id: $id, input: { isOpen: $isOpen }) {
+    updateRestaurant(id: $id, isOpen: $isOpen) {
       id isOpen
     }
   }
@@ -125,7 +156,7 @@ export default function RestaurantDashboard() {
     const [pollInterval, setPollInterval] = useState(5000) // 5s polling
 
     // Data fetching with polling
-    const { data: restaurantsData, loading: restaurantsLoading, refetch: refetchRestaurants } = useQuery<any>(GET_MY_RESTAURANTS)
+    const { data: restaurantsData, loading: restaurantsLoading, error: restaurantsError, refetch: refetchRestaurants } = useQuery<any>(GET_MY_RESTAURANTS)
     const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useQuery<any>(GET_RESTAURANT_ORDERS, {
         variables: { restaurantId: selectedRestaurantId, status: filterStatus || undefined },
         skip: !selectedRestaurantId,
@@ -155,8 +186,16 @@ export default function RestaurantDashboard() {
         skip: !selectedRestaurantId,
     })
 
-    const restaurants = restaurantsData?.myRestaurants || []
-    const menuItems = menuData?.menu || []
+    // useMemo prevents new array references on every render.
+    // Using `|| []` directly creates a NEW [] each render → triggers all effects that depend on it.
+    const restaurants = useMemo(
+        () => restaurantsData?.myRestaurants ?? [],
+        [restaurantsData]
+    )
+    const menuItems = useMemo(
+        () => menuData?.menu ?? [],
+        [menuData]
+    )
 
     // Local state for orders — source of truth for the UI
     const [localOrders, setLocalOrders] = useState<any[]>([])
@@ -191,12 +230,13 @@ export default function RestaurantDashboard() {
         }
     }, [restaurantsLoading, restaurants, selectedRestaurantId])
 
-    // Redirect to create if no restaurants
+    // Redirect to create ONLY when the query succeeded and returned 0 restaurants.
+    // If the query errored (network, 429, etc.) don't redirect — the restaurant may still exist.
     useEffect(() => {
-        if (!restaurantsLoading && restaurants.length === 0) {
+        if (!restaurantsLoading && !restaurantsError && restaurantsData && restaurants.length === 0) {
             navigate('/create-restaurant', { replace: true })
         }
-    }, [restaurantsLoading, restaurants, navigate])
+    }, [restaurantsLoading, restaurantsError, restaurantsData, restaurants, navigate])
 
     // Nota: el pollInterval del useQuery ya maneja el refresco automático.
     // El setInterval manual fue eliminado para evitar refetches duplicados.
@@ -221,7 +261,8 @@ export default function RestaurantDashboard() {
         e.preventDefault()
         if (!selectedRestaurantId) return
 
-        const input = {
+        // Variables are flat — no `input` wrapper (matches restaurant-service schema)
+        const commonVars = {
             name: menuForm.name,
             description: menuForm.description || undefined,
             price: parseFloat(menuForm.price),
@@ -230,9 +271,9 @@ export default function RestaurantDashboard() {
         }
 
         if (editingItem) {
-            await updateMenuItem({ variables: { id: editingItem.id, input } })
+            await updateMenuItem({ variables: { id: editingItem.id, ...commonVars } })
         } else {
-            await createMenuItem({ variables: { restaurantId: selectedRestaurantId, input } })
+            await createMenuItem({ variables: { restaurantId: selectedRestaurantId, ...commonVars } })
         }
 
         setShowNewItemForm(false)

@@ -190,8 +190,8 @@ export class RestaurantService {
 
   async createRestaurant(input: CreateRestaurantInput): Promise<Restaurant> {
     const result = await this.pool.query(
-      `INSERT INTO restaurants (name, description, address, phone, cuisine_type, owner_id, rating)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO restaurants (name, description, address, phone, cuisine_type, owner_id, rating, is_open)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true)
        RETURNING *`,
       [input.name, input.description || null, input.address, input.phone || null, input.cuisineType, input.ownerId, input.rating || 0.0]
     );

@@ -97,7 +97,8 @@ Item dentro de un pedido
 """
 type OrderItem {
   id: ID!
-  menuItem: MenuItem!
+  menuItemId: ID!
+  name: String
   quantity: Int!
   price: Float!
   subtotal: Float!
@@ -179,6 +180,12 @@ type Query {
     offset: Int = 0
   ): [Order!]!
   order(id: ID!): Order
+  restaurantOrders(
+    restaurantId: ID!
+    status: OrderStatus
+    limit: Int = 50
+    offset: Int = 0
+  ): [Order!]!
   
   # Repartidores
   availableDeliveryPersons(
@@ -204,9 +211,33 @@ type Mutation {
   
   # Restaurantes
   createRestaurant(input: CreateRestaurantInput!): Restaurant!
-  updateRestaurant(id: ID!, input: UpdateRestaurantInput!): Restaurant!
-  createMenuItem(restaurantId: ID!, input: CreateMenuItemInput!): MenuItem!
-  updateMenuItem(id: ID!, input: UpdateMenuItemInput!): MenuItem!
+  updateRestaurant(
+    id: ID!
+    name: String
+    description: String
+    address: AddressInput
+    phone: String
+    email: String
+    cuisineType: String
+    isOpen: Boolean
+    rating: Float
+  ): Restaurant!
+  createMenuItem(
+    restaurantId: ID!
+    name: String!
+    description: String
+    price: Float!
+    category: String
+    isAvailable: Boolean
+  ): MenuItem!
+  updateMenuItem(
+    id: ID!
+    name: String
+    description: String
+    price: Float
+    category: String
+    isAvailable: Boolean
+  ): MenuItem!
   deleteMenuItem(id: ID!): Boolean!
   
   # Pedidos
@@ -253,7 +284,8 @@ input UpdateRestaurantInput {
   phone: String
   email: String
   cuisineType: String
-  isActive: Boolean
+  isOpen: Boolean
+  rating: Float
 }
 
 input AddressInput {

@@ -204,6 +204,7 @@ services:
       PORT: 3001
       DATABASE_URL: postgresql://postgres:postgres@postgres-restaurant:5432/restaurant_db
       REDIS_URL: redis://redis:6379
+      CACHE_TTL: 30
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       SERVICE_NAME: restaurant-service
     ports:
