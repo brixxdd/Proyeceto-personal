@@ -1,0 +1,127 @@
+================================================================================
+DELIVERY PERSON (REPARTIDOR) - CHECKLIST DE IMPLEMENTACIÓN
+================================================================================
+
+Fecha inicio: 2026-04-27
+Estado: 🚧 En desarrollo
+
+================================================================================
+FASE 1: BASE (Lo más fácil)
+================================================================================
+
+[x] 1.1 Role DELIVERY_PERSON ya existe en Register.tsx
+[x] 1.2 Auth service soporta DELIVERY_PERSON role
+
+PENDIENTE:
+
+[ ] 1.3 Repartidor dashboard page (entregas asignadas)
+       - Page: frontend/src/pages/DeliveryDashboard.tsx
+       - Query: deliveryOrders (pedidos asignados al repartidor)
+       - Route: /delivery (agregar a App.tsx)
+
+[ ] 1.4 Confirmación de entrega (botón completado)
+       - Mutation: updateDeliveryStatus(orderId, status)
+       - Estados: PICKED_UP → DELIVERED
+
+[ ] 1.5 Ver detalle de pedido asignado
+       - Page: frontend/src/pages/DeliveryOrderDetail.tsx
+       - Info: dirección cliente, restaurante, items, mapa
+
+================================================================================
+FASE 2: UBICACIÓN Y MAPS
+================================================================================
+
+[ ] 2.1 Integración Google Maps / Mapbox
+       - API key configuration
+       - Componente de mapa para rutas
+
+[ ] 2.2 Mostrar ubicación del restaurante y cliente en mapa
+       - Marker restaurante (punto recogida)
+       - Marker cliente (punto entrega)
+       - Ruta entre ambos
+
+[ ] 2.3 Navegación turn-by-turn
+       - Botón "Abrir en Maps" con coordenadas
+
+================================================================================
+FASE 3: REAL-TIME
+================================================================================
+
+[ ] 3.1 Location tracking del repartidor
+       - WebSocket para enviar ubicación al backend
+       - Guardar en Redis o DB
+
+[ ] 3.2 Notificaciones push nuevos pedidos
+       - GraphQL subscription: newDeliveryOrder
+       - Permission notification (browser)
+
+[ ] 3.3 Accept/reject pedido
+       - Mutation: acceptDeliveryOrder(orderId)
+       - Mutation: rejectDeliveryOrder(orderId)
+
+================================================================================
+FASE 4: VERIFICACIÓN DE ENTREGA
+================================================================================
+
+[ ] 4.1 Confirmación con foto
+       - Tomar foto al entregar
+       - Guardar URL en DB
+
+[ ] 4.2 Confirmación con firma (opcional)
+       - Canvas para firma digital
+       - Guardar como imagen
+
+[ ] 4.3 QR code scan (opcional avanzado)
+       - Cliente muestra QR
+       - Repartidor escanea para confirmar
+
+================================================================================
+BACKEND REQUIREMENTS
+================================================================================
+
+delivery-service necesita:
+
+1. Query: deliveryOrders(deliveryPersonId)
+   - Pedidos asignados a este repartidor con status relevante
+
+2. Query: deliveryOrder(id)
+   - Detalle completo de un pedido asignado
+
+3. Mutation: updateDeliveryStatus(orderId, status, photoUrl?, signature?)
+   - Cambiar estado: PENDING_ASSIGNMENT → ASSIGNED → PICKED_UP → DELIVERED
+
+4. Mutation: acceptDeliveryOrder(orderId, deliveryPersonId)
+   - Asignarse un pedido disponible
+
+5. Mutation: rejectDeliveryOrder(orderId)
+   - Rechazar pedido asignado
+
+6. Subscription: newDeliveryOrder(deliveryPersonId)
+   - Notificar cuando se asigna nuevo pedido
+
+7. Subscription: orderStatusChanged(orderId)
+   - Tracking de cambios mientras entrega
+
+8. Mutation: updateLocation(deliveryPersonId, lat, lng)
+   - Actualizar ubicación en tiempo real
+
+================================================================================
+FRONTEND PAGES
+================================================================================
+
+/delivery                  → DeliveryDashboard (lista de pedidos)
+/delivery/orders/:id       → DeliveryOrderDetail (detalle + mapa)
+
+================================================================================
+ORDEN RECOMENDADO DE IMPLEMENTACIÓN
+================================================================================
+
+1. [ ] delivery-service: Queries y mutations básicas
+2. [ ] DeliveryDashboard.tsx: Lista de pedidos
+3. [ ] DeliveryOrderDetail.tsx: Detalle
+4. [ ] Botón "Marcar como entregado"
+5. [ ] Integración mapa (Google Maps)
+6. [ ] Location tracking
+7. [ ] Notificaciones push
+
+================================================================================
