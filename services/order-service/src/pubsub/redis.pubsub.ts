@@ -87,3 +87,6 @@ export const orderStatusChannel = (orderId: string) => `order:status:${orderId}`
 
 /** Channel for new orders at a restaurant */
 export const restaurantNewOrderChannel = (restaurantId: string) => `restaurant:${restaurantId}:newOrder`;
+
+/** Channel for notifying a user when their order is updated */
+export const userOrderUpdatedChannel = (userId: string) => `user:${userId}:ordersUpdated`;

@@ -1,14 +1,28 @@
-import { useQuery } from '@apollo/client/react'
+import { useQuery, useApolloClient } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Link } from 'react-router-dom'
 import { motion, type Variants } from 'framer-motion'
 import { Clock, ChevronRight, ShoppingBag } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
+import { useEffect } from 'react'
 
 const GET_ORDERS = gql`
   query GetOrders {
     orders {
       id status totalAmount restaurantId createdAt
+    }
+  }
+`
+
+const MY_ORDERS_UPDATED = gql`
+  subscription OnMyOrdersUpdated {
+    myOrdersUpdated {
+      id
+      status
+      totalAmount
+      restaurantId
+      createdAt
+      updatedAt
     }
   }
 `
@@ -29,7 +43,33 @@ const itemVariants: Variants = {
 }
 
 export default function Orders() {
+  const client = useApolloClient()
   const { data, loading, error } = useQuery<any>(GET_ORDERS)
+
+  useEffect(() => {
+    const observable = client.subscribe<any>({
+      query: MY_ORDERS_UPDATED,
+    })
+
+    const subscription = observable.subscribe({
+      next: ({ data }) => {
+        if (data?.myOrdersUpdated) {
+          const updatedOrder = data.myOrdersUpdated
+          client.cache.modify({
+            id: client.cache.identify({ __typename: 'Order', id: updatedOrder.id }),
+            fields: {
+              status() { return updatedOrder.status },
+              totalAmount() { return updatedOrder.totalAmount },
+              updatedAt() { return updatedOrder.updatedAt },
+            }
+          })
+        }
+      },
+      error: (err) => console.error('[Orders] Subscription error:', err)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [client])
 
   if (loading) return (
     <PageTransition>

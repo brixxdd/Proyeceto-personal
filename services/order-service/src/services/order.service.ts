@@ -2,7 +2,7 @@ import { createClient } from 'redis';
 import { Order, OrderStatus, CreateOrderInput } from '../models/order.model';
 import { OrderRepository } from '../repositories/order.repository';
 import { KafkaProducer } from '../events/kafka.producer';
-import { RedisPubSub, orderStatusChannel, restaurantNewOrderChannel } from '../pubsub/redis.pubsub';
+import { RedisPubSub, orderStatusChannel, restaurantNewOrderChannel, userOrderUpdatedChannel } from '../pubsub/redis.pubsub';
 import { logger } from '../utils/logger';
 import { fetchMenuItemPrices } from '../clients/restaurant.client';
 
@@ -100,6 +100,9 @@ export class OrderService {
 
     // Notify GraphQL subscribers (real-time)
     await this.pubSub.publish(orderStatusChannel(id), order);
+
+    // Notify user subscribers about order update
+    await this.pubSub.publish(userOrderUpdatedChannel(order.customerId), order);
 
     // Publish appropriate Kafka event based on status
     if (status === OrderStatus.ASSIGNED && deliveryPersonId) {

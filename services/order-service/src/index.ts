@@ -103,6 +103,10 @@ const resolvers = {
       subscribe: orderResolver.subscribeToOrderUpdated.bind(orderResolver),
       resolve: (payload: unknown) => payload,
     },
+    myOrdersUpdated: {
+      subscribe: orderResolver.subscribeToMyOrdersUpdated.bind(orderResolver),
+      resolve: (payload: unknown) => payload,
+    },
   },
 };
 

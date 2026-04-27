@@ -17,6 +17,7 @@ type Subscription {
   orderStatusChanged(orderId: ID!): Order!
   restaurantOrderCreated(restaurantId: ID!): Order!
   orderUpdated(orderId: ID!): Order!
+  myOrdersUpdated: Order!
 }
 
 type Order @key(fields: "id") {

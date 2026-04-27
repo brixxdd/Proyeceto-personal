@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { OrderService } from '../services/order.service';
-import { RedisPubSub, orderStatusChannel, restaurantNewOrderChannel } from '../pubsub/redis.pubsub';
+import { RedisPubSub, orderStatusChannel, restaurantNewOrderChannel, userOrderUpdatedChannel } from '../pubsub/redis.pubsub';
 import { Order, OrderStatus, CreateOrderInput } from '../models/order.model';
 import { requireAuth, AuthContext, JwtPayload } from '../middleware/auth';
 
@@ -201,6 +201,17 @@ export class OrderResolver {
     requireAuth(context.auth);
     return context.pubSub.asyncIterator<Order>(
       orderStatusChannel(args.orderId),
+    ) as unknown as AsyncIterable<Order>;
+  }
+
+  subscribeToMyOrdersUpdated(
+    _parent: unknown,
+    _args: Record<string, never>,
+    context: Context,
+  ): AsyncIterable<Order> {
+    const user = requireAuth(context.auth);
+    return context.pubSub.asyncIterator<Order>(
+      userOrderUpdatedChannel(user.userId),
     ) as unknown as AsyncIterable<Order>;
   }
 }
