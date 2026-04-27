@@ -95,6 +95,14 @@ const resolvers = {
       // resolve maps the raw published Order to the field value
       resolve: (payload: unknown) => payload,
     },
+    restaurantOrderCreated: {
+      subscribe: orderResolver.subscribeToRestaurantNewOrder.bind(orderResolver),
+      resolve: (payload: unknown) => payload,
+    },
+    orderUpdated: {
+      subscribe: orderResolver.subscribeToOrderUpdated.bind(orderResolver),
+      resolve: (payload: unknown) => payload,
+    },
   },
 };
 

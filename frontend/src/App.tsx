@@ -32,6 +32,7 @@ const LazyProfile = lazy(() => import('./pages/Profile'))
 const LazyCart = lazy(() => import('./pages/Cart'))
 const LazyCheckout = lazy(() => import('./pages/Checkout'))
 const LazyRestaurantDashboard = lazy(() => import('./pages/RestaurantDashboard'))
+const LazyCreateRestaurant = lazy(() => import('./pages/CreateRestaurant'))
 
 /**
  * Skeleton fallback while lazy-loaded chunk is fetching
@@ -82,9 +83,11 @@ export default function App() {
                   <Route
                     path="/restaurants/:id"
                     element={
-                      <Suspense fallback={<PageSkeleton />}>
-                        <LazyRestaurantDetail />
-                      </Suspense>
+                      <ProtectedRoute redirectTo="/login">
+                        <Suspense fallback={<PageSkeleton />}>
+                          <LazyRestaurantDetail />
+                        </Suspense>
+                      </ProtectedRoute>
                     }
                   />
 
@@ -150,6 +153,19 @@ export default function App() {
                         <RoleRoute allowedRoles="RESTAURANT_OWNER,ADMIN" redirectTo="/restaurants">
                           <Suspense fallback={<PageSkeleton />}>
                             <LazyRestaurantDashboard />
+                          </Suspense>
+                        </RoleRoute>
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/create-restaurant"
+                    element={
+                      <ProtectedRoute>
+                        <RoleRoute allowedRoles="RESTAURANT_OWNER,ADMIN" redirectTo="/restaurants">
+                          <Suspense fallback={<PageSkeleton />}>
+                            <LazyCreateRestaurant />
                           </Suspense>
                         </RoleRoute>
                       </ProtectedRoute>

@@ -89,7 +89,6 @@ export default function Navbar() {
           {/* Desktop guest nav */}
           <div className="hidden md:flex items-center gap-1">
             <NavLink to="/restaurants" icon={UtensilsCrossed} label="Explorar" active={pathname.startsWith('/restaurants')} />
-            <NavLink to="/login" icon={User} label="Iniciar sesión" active={pathname === '/login'} />
           </div>
 
           {/* Right actions */}

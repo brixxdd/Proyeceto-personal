@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -18,9 +18,11 @@ const LOGIN = gql`
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const [login, { loading, error }] = useMutation<any>(LOGIN)
+  const redirectTo = location.state?.from?.pathname || null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -29,12 +31,16 @@ export default function Login() {
       if (data?.login?.token) {
         sessionStorage.setItem('token', data.login.token)
         sessionStorage.setItem('user_role', data.login.user?.role || '')
-        // Role-based redirect
-        const role = data.login.user?.role
-        if (role === 'RESTAURANT_OWNER' || role === 'ADMIN') {
-          navigate('/dashboard')
+        // Redirect to intended destination, or role-based default
+        if (redirectTo) {
+          navigate(redirectTo, { replace: true })
         } else {
-          navigate('/restaurants')
+          const role = data.login.user?.role
+          if (role === 'RESTAURANT_OWNER' || role === 'ADMIN') {
+            navigate('/dashboard')
+          } else {
+            navigate('/restaurants')
+          }
         }
       }
     } catch { /* error state handled by Apollo */ }
@@ -67,7 +73,7 @@ export default function Login() {
                 Bienvenido de vuelta
               </h2>
               <p className="text-[15px] font-medium text-[var(--color-muted-foreground)]">
-                Ingresa a tu cuenta para continuar
+                {redirectTo ? 'Inicia sesión para continuar donde lo dejaste' : 'Ingresa a tu cuenta para continuar'}
               </p>
             </motion.div>
 

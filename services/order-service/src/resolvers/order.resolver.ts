@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { OrderService } from '../services/order.service';
-import { RedisPubSub, orderStatusChannel } from '../pubsub/redis.pubsub';
+import { RedisPubSub, orderStatusChannel, restaurantNewOrderChannel } from '../pubsub/redis.pubsub';
 import { Order, OrderStatus, CreateOrderInput } from '../models/order.model';
 import { requireAuth, AuthContext, JwtPayload } from '../middleware/auth';
 
@@ -177,6 +177,28 @@ export class OrderResolver {
     requireAuth(context.auth);
     // PubSubAsyncIterableIterator implements both AsyncIterator and AsyncIterable at runtime;
     // the base-class types only declare AsyncIterator, so we cast through unknown.
+    return context.pubSub.asyncIterator<Order>(
+      orderStatusChannel(args.orderId),
+    ) as unknown as AsyncIterable<Order>;
+  }
+
+  subscribeToRestaurantNewOrder(
+    _parent: unknown,
+    args: { restaurantId: string },
+    context: Context,
+  ): AsyncIterable<Order> {
+    requireAuth(context.auth);
+    return context.pubSub.asyncIterator<Order>(
+      restaurantNewOrderChannel(args.restaurantId),
+    ) as unknown as AsyncIterable<Order>;
+  }
+
+  subscribeToOrderUpdated(
+    _parent: unknown,
+    args: { orderId: string },
+    context: Context,
+  ): AsyncIterable<Order> {
+    requireAuth(context.auth);
     return context.pubSub.asyncIterator<Order>(
       orderStatusChannel(args.orderId),
     ) as unknown as AsyncIterable<Order>;

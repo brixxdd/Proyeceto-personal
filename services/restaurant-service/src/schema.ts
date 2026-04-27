@@ -1,6 +1,7 @@
 export const typeDefs = `#graphql
   extend type Query {
     restaurants(isOpen: Boolean): [Restaurant!]!
+    myRestaurants: [Restaurant!]!
     restaurant(id: ID!): Restaurant
     menu(restaurantId: ID!): [MenuItem!]!
     menuItem(id: ID!): MenuItem
@@ -8,15 +9,7 @@ export const typeDefs = `#graphql
   }
 
   extend type Mutation {
-    createRestaurant(
-      name: String!
-      description: String
-      address: String!
-      cuisineType: String!
-      ownerId: ID!
-      phone: String
-      rating: Float
-    ): Restaurant!
+    createRestaurant(input: CreateRestaurantInput!): Restaurant!
 
     updateRestaurant(
       id: ID!
@@ -56,12 +49,22 @@ export const typeDefs = `#graphql
     restaurantStatusChanged(restaurantId: ID!): RestaurantStatusChanged!
   }
 
+  input CreateRestaurantInput {
+    name: String!
+    description: String
+    address: String!
+    phone: String
+    email: String
+    cuisineType: String!
+  }
+
   type Restaurant @key(fields: "id") {
     id: ID!
     name: String!
     description: String
     address: String!
     phone: String
+    email: String
     cuisineType: String!
     ownerId: ID!
     isOpen: Boolean!

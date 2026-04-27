@@ -2,7 +2,7 @@ import { createClient } from 'redis';
 import { Order, OrderStatus, CreateOrderInput } from '../models/order.model';
 import { OrderRepository } from '../repositories/order.repository';
 import { KafkaProducer } from '../events/kafka.producer';
-import { RedisPubSub, orderStatusChannel } from '../pubsub/redis.pubsub';
+import { RedisPubSub, orderStatusChannel, restaurantNewOrderChannel } from '../pubsub/redis.pubsub';
 import { logger } from '../utils/logger';
 import { fetchMenuItemPrices } from '../clients/restaurant.client';
 
@@ -52,6 +52,9 @@ export class OrderService {
       totalAmount: order.totalAmount,
       timestamp: new Date().toISOString(),
     });
+
+    // Notify restaurant dashboard subscribers (real-time new order)
+    await this.pubSub.publish(restaurantNewOrderChannel(order.restaurantId), order);
 
     logger.info(`Order created: ${order.id}`);
     return order;

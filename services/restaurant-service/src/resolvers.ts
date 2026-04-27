@@ -42,6 +42,11 @@ export const resolvers = {
       logger.debug('Query: restaurants', args);
       return restaurantService.getRestaurants(args.isOpen);
     },
+    myRestaurants: async (_parent: any, _args: any, context: Context) => {
+      const user = requireAuth(context);
+      logger.debug('Query: myRestaurants', { userId: user.userId });
+      return restaurantService.getRestaurantsByOwner(user.userId);
+    },
     restaurant: async (_parent: any, args: { id: string }) => {
       logger.debug('Query: restaurant', args);
       const restaurant = await restaurantService.getRestaurantById(args.id);
@@ -73,9 +78,10 @@ export const resolvers = {
       if (user.role !== 'RESTAURANT_OWNER' && user.role !== 'ADMIN') {
         throw new Error('Not authorized: only restaurant owners can create restaurants');
       }
-      logger.info('Mutation: createRestaurant', { userId: user.userId });
+      logger.info('Mutation: createRestaurant', { userId: user.userId, args: args });
+      // args.input contains { name, description, address, phone, email, cuisineType }
       // Force ownerId to authenticated user
-      return restaurantService.createRestaurant({ ...args, ownerId: user.userId });
+      return restaurantService.createRestaurant({ ...args.input, ownerId: user.userId });
     },
     updateRestaurant: async (_parent: any, args: any, context: Context) => {
       const user = requireAuth(context);

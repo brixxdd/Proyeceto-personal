@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -67,6 +67,7 @@ function getBannerStyle(cuisineType: string = '') {
 export default function RestaurantDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { addItem, removeItem, items, itemCount, total, restaurantId } = useCart()
   const { data, loading, error } = useQuery<any>(GET_RESTAURANT, { variables: { id } })
   const [createOrder, { loading: ordering }] = useMutation(CREATE_ORDER)
@@ -97,6 +98,10 @@ export default function RestaurantDetail() {
   }
 
   function handleAddToCart(menuItem: MenuItem, restaurantName: string) {
+    if (!sessionStorage.getItem('token')) {
+      navigate('/login', { state: { from: location.pathname } })
+      return
+    }
     if (restaurantId && restaurantId !== id) {
       // Cart has items from different restaurant — warn user
       if (!confirm('Tu carrito tiene artículos de otro restaurante. ¿Quieres vaciarlo y agregar este artículo?')) return

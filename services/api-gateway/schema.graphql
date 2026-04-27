@@ -169,6 +169,7 @@ type Query {
     limit: Int = 20
     offset: Int = 0
   ): [Restaurant!]!
+  myRestaurants: [Restaurant!]!
   restaurant(id: ID!): Restaurant
   
   # Pedidos
@@ -206,6 +207,7 @@ type Mutation {
   updateRestaurant(id: ID!, input: UpdateRestaurantInput!): Restaurant!
   createMenuItem(restaurantId: ID!, input: CreateMenuItemInput!): MenuItem!
   updateMenuItem(id: ID!, input: UpdateMenuItemInput!): MenuItem!
+  deleteMenuItem(id: ID!): Boolean!
   
   # Pedidos
   createOrder(input: CreateOrderInput!): Order!
@@ -230,7 +232,7 @@ type Subscription {
   # Notificaciones en tiempo real
   orderStatusChanged(orderId: ID!): Order!
   newOrder(restaurantId: ID!): Order!
-  availableOrders: Order!
+  orderUpdated(orderId: ID!): Order!
 }
 
 # Input Types

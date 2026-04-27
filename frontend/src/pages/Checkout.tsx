@@ -13,8 +13,8 @@ const CREATE_ORDER = gql`
     createOrder(input: $input) {
       id
       status
-      total
-      estimatedDelivery
+      totalAmount
+      estimatedDeliveryTime
     }
   }
 `
@@ -30,8 +30,9 @@ export default function Checkout() {
         street: '',
         number: '',
         city: '',
-        zip: '',
-        notes: '',
+        state: '',
+        zipCode: '',
+        country: 'México',
     })
     const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card')
 
@@ -53,8 +54,13 @@ export default function Checkout() {
                             menuItemId: i.menuItemId,
                             quantity: i.quantity,
                         })),
-                        deliveryAddress: `${form.street} ${form.number}, ${form.city}, ${form.zip}`,
-                        notes: form.notes,
+                        deliveryAddress: {
+                            street: `${form.street} ${form.number}`,
+                            city: form.city,
+                            state: form.state || 'CDMX',
+                            zipCode: form.zipCode,
+                            country: form.country,
+                        },
                     },
                 },
             })
@@ -62,7 +68,7 @@ export default function Checkout() {
             const order = (data as any)?.createOrder
             if (order) {
                 setOrderId(order.id)
-                setEstimatedDelivery(order.estimatedDelivery)
+                setEstimatedDelivery(order.estimatedDeliveryTime)
                 setStep('confirmation')
                 clearCart()
             }
@@ -226,33 +232,21 @@ export default function Checkout() {
                                 <input
                                     id="zip"
                                     type="text"
-                                    value={form.zip}
-                                    onChange={e => setForm(f => ({ ...f, zip: e.target.value }))}
+                                    value={form.zipCode}
+                                    onChange={e => setForm(f => ({ ...f, zipCode: e.target.value }))}
                                     className="w-full px-4 py-3.5 rounded-[16px] border border-[var(--color-border)] bg-[var(--color-muted)] text-[15px] focus:bg-[var(--color-card)] transition-colors"
                                     placeholder="06600"
                                     required
                                 />
                             </motion.div>
 
-                            <motion.div variants={slideUp}>
-                                <label htmlFor="notes" className="text-[13px] font-semibold text-[var(--color-foreground)] block mb-1.5">
-                                    Notas para el repartidor <span className="text-[var(--color-muted-foreground)] font-normal">(opcional)</span>
-                                </label>
-                                <textarea
-                                    id="notes"
-                                    value={form.notes}
-                                    onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                                    className="w-full px-4 py-3.5 rounded-[16px] border border-[var(--color-border)] bg-[var(--color-muted)] text-[15px] focus:bg-[var(--color-card)] transition-colors resize-none"
-                                    placeholder="Por favor toca el timbre 3B"
-                                    rows={2}
-                                />
-                            </motion.div>
+
                         </div>
 
                         <motion.button
                             variants={slideUp}
                             onClick={() => setStep('payment')}
-                            disabled={!form.street || !form.number || !form.city || !form.zip}
+                            disabled={!form.street || !form.number || !form.city || !form.zipCode}
                             className="w-full mt-6 py-4 rounded-[16px] font-semibold text-white text-[15px] bg-[var(--color-primary)] ios-shadow disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Continuar al pago

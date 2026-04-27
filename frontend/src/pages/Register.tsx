@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -16,17 +16,34 @@ const REGISTER = gql`
   }
 `
 
+const ROLES = [
+  { value: 'CUSTOMER', label: 'Cliente', desc: 'Quiero ordenar comida' },
+  { value: 'RESTAURANT_OWNER', label: 'Restaurante', desc: 'Tengo un restaurante' },
+  { value: 'DELIVERY_PERSON', label: 'Repartidor', desc: 'Quiero delivering comida' },
+]
+
 export default function Register() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const location = useLocation()
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'CUSTOMER' })
   const [showPass, setShowPass] = useState(false)
   const [register, { loading, error }] = useMutation(REGISTER)
+  const redirectTo = location.state?.from?.pathname || null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const { data } = await register({ variables: { ...form, role: 'CUSTOMER' } })
+    const { data } = await register({ variables: form })
     sessionStorage.setItem('token', (data as any).register.token)
-    navigate('/restaurants')
+    sessionStorage.setItem('user_role', form.role)
+    if (redirectTo) {
+      navigate(redirectTo, { replace: true })
+    } else {
+      if (form.role === 'RESTAURANT_OWNER') {
+        navigate('/dashboard')
+      } else {
+        navigate('/restaurants')
+      }
+    }
   }
 
   const fields = [
@@ -119,6 +136,34 @@ export default function Register() {
                   >
                     {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
+                </div>
+              </motion.div>
+
+              {/* Role selector */}
+              <motion.div variants={slideUp} className="flex flex-col gap-1.5">
+                <label className="text-[13px] font-semibold text-[var(--color-foreground)] px-1">Tipo de cuenta</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {ROLES.map(role => (
+                    <button
+                      key={role.value}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, role: role.value }))}
+                      className={`p-3 rounded-[14px] border text-center transition-all ${form.role === role.value
+                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
+                          : 'border-[var(--color-border)] bg-[var(--color-muted)]'
+                        }`}
+                    >
+                      <p className={`text-[13px] font-semibold ${form.role === role.value
+                          ? 'text-[var(--color-primary)]'
+                          : 'text-[var(--color-foreground)]'
+                        }`}>
+                        {role.label}
+                      </p>
+                      <p className="text-[10px] text-[var(--color-muted-foreground)] mt-0.5 hidden sm:block">
+                        {role.desc}
+                      </p>
+                    </button>
+                  ))}
                 </div>
               </motion.div>
 

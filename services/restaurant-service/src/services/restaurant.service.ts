@@ -128,6 +128,35 @@ export class RestaurantService {
     return restaurants;
   }
 
+  async getRestaurantsByOwner(ownerId: string): Promise<Restaurant[]> {
+    const cacheKey = `restaurants:owner:${ownerId}`;
+
+    try {
+      const cached = await this.redis.get(cacheKey);
+      if (cached) {
+        logger.debug('Cache hit for owner restaurants', { ownerId });
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      logger.warn('Cache read failed, falling back to DB');
+    }
+
+    const result = await this.pool.query(
+      'SELECT * FROM restaurants WHERE owner_id = $1 ORDER BY created_at DESC',
+      [ownerId]
+    );
+
+    const restaurants = result.rows.map(this.mapRestaurant);
+
+    try {
+      await this.redis.setEx(cacheKey, this.cacheTTL, JSON.stringify(restaurants));
+    } catch (error) {
+      logger.warn('Cache write failed');
+    }
+
+    return restaurants;
+  }
+
   async getRestaurantById(id: string): Promise<Restaurant | null> {
     const cacheKey = `restaurant:${id}`;
 

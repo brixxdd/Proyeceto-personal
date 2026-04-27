@@ -84,3 +84,6 @@ export class RedisPubSub extends PubSubEngine {
 
 /** Channel name for order status updates */
 export const orderStatusChannel = (orderId: string) => `order:status:${orderId}`;
+
+/** Channel for new orders at a restaurant */
+export const restaurantNewOrderChannel = (restaurantId: string) => `restaurant:${restaurantId}:newOrder`;
