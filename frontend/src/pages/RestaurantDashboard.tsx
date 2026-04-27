@@ -31,7 +31,7 @@ const GET_RESTAURANT_ORDERS = gql`
       customerId
       status
       totalAmount
-      items { id menuItemId quantity price subtotal name }
+      items { id menuItemId quantity price subtotal }
       deliveryAddress { street city state zipCode }
       createdAt
       updatedAt
@@ -61,7 +61,7 @@ const RESTAURANT_ORDER_CREATED = gql`
   subscription OnRestaurantOrderCreated($restaurantId: ID!) {
     newOrder(restaurantId: $restaurantId) {
       id customerId status totalAmount
-      items { id menuItemId quantity price subtotal name }
+      items { id menuItemId quantity price subtotal }
       deliveryAddress { street city state zipCode }
       createdAt updatedAt
     }
@@ -157,7 +157,7 @@ export default function RestaurantDashboard() {
 
     // Data fetching with polling
     const { data: restaurantsData, loading: restaurantsLoading, error: restaurantsError, refetch: refetchRestaurants } = useQuery<any>(GET_MY_RESTAURANTS)
-    const { data: ordersData, loading: ordersLoading, refetch: refetchOrders } = useQuery<any>(GET_RESTAURANT_ORDERS, {
+    const { data: ordersData, loading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery<any>(GET_RESTAURANT_ORDERS, {
         variables: { restaurantId: selectedRestaurantId, status: filterStatus || undefined },
         skip: !selectedRestaurantId,
         pollInterval: pollInterval,
@@ -208,6 +208,13 @@ export default function RestaurantDashboard() {
             setLocalOrders(ordersData.restaurantOrders)
         }
     }, [ordersData])
+
+    // Log errors for debugging
+    useEffect(() => {
+        if (ordersError) {
+            console.error('[RestaurantDashboard] Error fetching orders:', ordersError.message)
+        }
+    }, [ordersError])
 
     // Handle new order from subscription — prepend to the list
     useEffect(() => {
@@ -466,6 +473,20 @@ export default function RestaurantDashboard() {
                                     {[1, 2, 3].map(i => (
                                         <div key={i} className="h-32 rounded-[20px] animate-pulse bg-[var(--color-border)] opacity-60" />
                                     ))}
+                                </div>
+                            ) : ordersError ? (
+                                <div className="flex flex-col items-center justify-center py-16 text-center">
+                                    <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                                        <AlertCircle size={28} className="text-red-500" />
+                                    </div>
+                                    <p className="text-red-500 font-medium mb-2">Error cargando pedidos</p>
+                                    <p className="text-[var(--color-muted-foreground)] text-[13px]">{ordersError.message}</p>
+                                    <button
+                                        onClick={() => refetchOrders()}
+                                        className="mt-4 px-4 py-2 rounded-[12px] bg-[var(--color-primary)] text-white text-[13px] font-semibold"
+                                    >
+                                        Reintentar
+                                    </button>
                                 </div>
                             ) : orders.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-16 text-center">

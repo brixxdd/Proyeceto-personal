@@ -1,8 +1,8 @@
 import { RedisClientType } from 'redis';
 import { logger } from '../utils/logger';
 
-const LOGIN_RATE_LIMIT = 5;       // max attempts
-const LOGIN_WINDOW_SECONDS = 900; // 15 min
+const LOGIN_RATE_LIMIT = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '5', 10);
+const LOGIN_WINDOW_SECONDS = parseInt(process.env.RATE_LIMIT_WINDOW_SECONDS || '900', 10);
 
 let client: RedisClientType | null = null;
 

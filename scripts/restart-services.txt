@@ -1,0 +1,31 @@
+# Comandos para reiniciar servicios en Docker Compose
+# Uso: docker-compose up -d --build <servicio>
+
+# Auth Service
+docker-compose up -d --build auth-service
+
+# API Gateway
+docker-compose up -d --build api-gateway
+
+# Order Service
+docker-compose up -d --build order-service
+
+# Restaurant Service
+docker-compose up -d --build restaurant-service
+
+# Delivery Service
+docker-compose up -d --build delivery-service
+
+# Notification Service
+docker-compose up -d --build notification-service
+
+# Reiniciar TODOS los servicios
+docker-compose up -d --build
+
+# Ver estado de servicios
+docker-compose ps
+
+# Ver logs de un servicio
+docker-compose logs -f auth-service
+docker-compose logs -f api-gateway
+docker-compose logs -f order-service
