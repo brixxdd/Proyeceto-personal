@@ -174,8 +174,8 @@ function SkeletonCard({ lines = 2 }: { lines?: number }) {
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: StatusKey }) {
-  const cfg = STATUS_CONFIG[status]
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status as StatusKey] || STATUS_CONFIG.PENDING
   return (
     <span
       className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
