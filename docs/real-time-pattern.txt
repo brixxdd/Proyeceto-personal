@@ -1,0 +1,345 @@
+================================================================================
+PATRÓN DE ACTUALIZACIÓN EN VIVO (REAL-TIME PATTERN)
+================================================================================
+
+Este documento describe cómo funciona el patrón de actualización en tiempo real
+usado en RestaurantDashboard.tsx y cómo replicarlo en cualquier componente.
+
+================================================================================
+FUNDAMENTOS
+================================================================================
+
+El problema fundamental: ¿cómo mantener la UI actualizada sin polling (sin
+consultas periódicas al servidor)?
+
+Solución: usar GraphQL Subscriptions + Estado Local.
+
+Las subscriptions permiten que el servidor ENVÍE datos al cliente cuando ocurren
+cambios, sin que el cliente tenga que pedir nada.
+
+================================================================================
+ARQUITECTURA DEL PATRÓN
+================================================================================
+
+Tres componentes clave:
+
+1. APOLLO QUERY CON FETCH POLICY
+   - fetchPolicy: 'cache-and-network'
+   - Pobla el estado local UNA SOLA VEZ al inicio
+   - Permite al usuario ver datos inmediatamente desde cache
+
+2. ESTADO LOCAL (useState)
+   - Es la ÚNICA fuente de verdad para la UI
+   - La query NUNCA se usa directamente en el render
+   - Se sincroniza desde la query al montar, y se modifica desde la subscription
+
+3. SUBSCRIPTION
+   - Se suscribe a eventos del servidor
+   - Cuando llega un evento, MODIFICA el estado local directamente
+   - NO reemplaza todo el array — hace prepend/append con check de duplicados
+
+================================================================================
+ANÁLISIS DETALLADO: RestaurantDashboard (LÍNEAS 180-248)
+================================================================================
+
+--- STEP 1: La Query ---
+const { data: ordersData, ... } = useQuery<any>(GET_RESTAURANT_ORDERS, {
+    variables: { restaurantId: selectedRestaurantId, status: filterStatus || undefined },
+    skip: !selectedRestaurantId,
+    fetchPolicy: 'cache-and-network',  // ← Clave: usa cache, luego refetch en background
+})
+
+fetchPolicy: 'cache-and-network' significa:
+- Si hay data en cache, mostrar INMEDIATAMENTE
+- En background, hacer network request para actualizar
+- El usuario nunca ve un estado de loading en subsequent renders
+
+--- STEP 2: Sync Inicial (useEffect líneas 227-231) ---
+useEffect(() => {
+    if (ordersData?.restaurantOrders) {
+        setLocalOrders(ordersData.restaurantOrders)  // ← Solo se ejecuta cuando ordersData CAMBIA
+    }
+}, [ordersData])  // ← Depende de ordersData (la referencia Apollo)
+
+Este useEffect:
+- Se ejecuta cuando la query regresa datos por primera vez
+- NO se vuelve a ejecutar si solo cambia algo en el cache local
+- Usa la referencia completa de ordersData como dependencia (previene loops infinitos)
+
+NOTA CRÍTICA: Usar `ordersData?.restaurantOrders` directamente en el array de
+dependencias causaría un loop infinito porque `|| []` crea un NUEVO array en
+cada render. Al depender de `ordersData` (la referencia del objeto Apollo),
+el efecto solo se dispara cuando el objeto Apollo real cambia.
+
+--- STEP 3: La Subscription (useEffect líneas 181-208) ---
+const newOrderObservable = client.subscribe<any>({
+    query: RESTAURANT_ORDER_CREATED,
+    variables: { restaurantId: selectedRestaurantId },
+})
+
+const newOrderSubscription = newOrderObservable.subscribe({
+    next: ({ data }) => {
+        if (data?.restaurantOrderCreated) {
+            const newOrder = data.restaurantOrderCreated
+            setLocalOrders(prev => {           // ← prev es el estado actual
+                const exists = prev.some(o => o.id === newOrder.id)  // ← Check duplicados
+                if (exists) return prev        // ← Si ya existe, no agregar
+                return [newOrder, ...prev]     // ← Prepend (agregar al inicio)
+            })
+        }
+    },
+    error: (err) => console.error('[RestaurantDashboard] Error:', err)
+})
+
+return () => { newOrderSubscription.unsubscribe() }
+
+Puntos clave:
+- El useEffect depende de [selectedRestaurantId, client]
+- Cuando cambia el restaurante seleccionado, se re-suscribe
+- Cleanup correcto con unsubscribe()
+- NO modifica ordersData — solo setLocalOrders
+
+--- STEP 4: Estado para el Render ---
+const orders = localOrders  // ← LA ÚNICA FUENTE DE VERDAD para el render
+
+En el JSX:
+{orders.map((order: any) => ...)}
+NUNCA se usa ordersData.restaurantOrders directamente en el render.
+
+================================================================================
+FLUJO COMPLETO DE UNA ACTUALIZACIÓN
+================================================================================
+
+ESCENARIO: Llega un nuevo pedido desde otro cliente
+
+1. order-service detecta cambio de estado
+2. order-service publica evento 'order.created' a Kafka
+3. restaurant-service consume de Kafka
+4. restaurant-service publica en Redis PubSub 'restaurantOrderCreated'
+5. Frontend recibe subscription data en RestaurantDashboard
+6. La subscription hace setLocalOrders(prev => [newOrder, ...prev])
+7. React detecta cambio en localOrders
+8. Componente re-renderiza con el nuevo pedido visible
+9. El indicador "Actualización en vivo" parpadea
+
+ESCENARIO: El usuario cambia de restaurante
+
+1. selectedRestaurantId cambia
+2. El useEffect de subscription hace cleanup (unsubscribe)
+3. El useEffect de sync ya no se ejecuta (skip: true cuando no hay selectedRestaurantId)
+4. El useEffect de auto-select (líneas 244-248) detecta que no hay selección y selecciona el primero
+5. El query de órdenes se ejecuta para el nuevo restaurante
+6. El sync effect pobla localOrders con las órdenes del nuevo restaurante
+7. La subscription se re-suscribe al nuevo restaurante
+
+================================================================================
+PATRÓN INCORRECTO (el que tiene DeliveryDashboard)
+================================================================================
+
+DeliveryDashboard tiene ESTE problema (líneas 151-155):
+
+useEffect(() => {
+    if (availableData?.availableDeliveries) {
+        setAvailableDeliveries(availableData.availableDeliveries)
+    }
+}, [availableData])
+
+Y ADEMÁS tiene ESTO (líneas 189-206):
+
+const subscription = observable.subscribe({
+    next: ({ data }) => {
+        if (data?.availableDeliveriesUpdated) {
+            setAvailableDeliveries(data.availableDeliveriesUpdated)  // ← SOBREESCRIBE todo
+        }
+    },
+    ...
+})
+
+PROBLEMA: Hay dos useEffects escribiendo al mismo state simultáneamente.
+
+Cuando llega la subscription con nuevos datos, sobreescribe todo el array.
+Cuando la query refetchea, también actualiza.
+
+Resultado: datos duplicados o datos overwritten.
+
+================================================================================
+CÓMO REPLICAR EL PATRÓN EN OTRO COMPONENTE
+================================================================================
+
+1. CREAR LA GRAPHQL SUBSCRIPTION
+
+Define una subscription en el schema del servicio:
+subscription OnSomethingUpdated($someId: ID!) {
+    somethingUpdated(someId: $someId) {
+        id
+        field1
+        field2
+        updatedAt
+    }
+}
+
+2. CREAR EL QUERY CON FETCH POLICY
+
+const GET_SOMETHING = gql`
+  query GetSomething($someId: ID!) {
+    something(someId: $someId) {
+      id
+      field1
+      field2
+      updatedAt
+    }
+  }
+`
+
+const { data: somethingData, ... } = useQuery(GET_SOMETHING, {
+    variables: { someId },
+    fetchPolicy: 'cache-and-network',  // ← No cambiar a 'network-only'
+    skip: !someId,
+})
+
+3. CREAR ESTADO LOCAL
+
+const [localSomething, setLocalSomething] = useState<any[]>([])
+
+4. CREAR USEFFECT DE SYNC (UNA SOLA VEZ)
+
+useEffect(() => {
+    if (somethingData?.something) {
+        setLocalSomething(somethingData.something)
+    }
+}, [somethingData])
+
+5. CREAR USEFFECT DE SUBSCRIPTION
+
+useEffect(() => {
+    if (!someId) return
+
+    const observable = client.subscribe<any>({
+        query: SOMETHING_UPDATED,
+        variables: { someId },
+    })
+
+    const subscription = observable.subscribe({
+        next: ({ data }) => {
+            if (data?.somethingUpdated) {
+                const updated = data.somethingUpdated
+                setLocalSomething(prev => {
+                    // CHECK DE DUPLICADOS
+                    const exists = prev.some(s => s.id === updated.id)
+                    if (exists) {
+                        // ACTUALIZAR en vez de agregar
+                        return prev.map(s => s.id === updated.id ? { ...s, ...updated } : s)
+                    }
+                    // PREPEND (agregar al inicio, más nuevo primero)
+                    return [updated, ...prev]
+                })
+            }
+        },
+        error: (err) => console.error('[ComponentName] Subscription error:', err)
+    })
+
+    return () => subscription.unsubscribe()
+}, [someId, client])
+
+6. USAR EL ESTADO LOCAL EN EL RENDER
+
+const something = localSomething  // ← Siempre usar el estado local, nunca data directly
+
+return (
+    <div>
+        {something.map(item => ...)}
+    </div>
+)
+
+================================================================================
+CHECK DE DUPLICADOS — POR QUÉ ES IMPORTANTE
+================================================================================
+
+El servidor PUEDE enviar el mismo evento múltiples veces debido a:
+- Reintentos de Kafka con backoff
+- Red PubSub que envía múltiples veces
+- Errores de red que causaron reintentos
+
+El check previene:
+- Duplicados visuales en la UI
+- Updates sobreescribiendo datos correctos con datos stale
+
+================================================================================
+PATRÓN PARA ACTUALIZACIONES (NO SOLO NUEVOS)
+================================================================================
+
+Si la subscription envía actualizaciones parciales de un item existente:
+
+setLocalSomething(prev => {
+    const exists = prev.some(s => s.id === updated.id)
+    if (exists) {
+        // MERGE: actualizar solo los campos que vinieron en la actualización
+        return prev.map(s => s.id === updated.id ? { ...s, ...updated } : s)
+    }
+    return [updated, ...prev]
+})
+
+Si la subscription solo envía items nuevos (nunca actualizaciones):
+
+setLocalSomething(prev => {
+    const exists = prev.some(s => s.id === updated.id)
+    if (exists) return prev
+    return [updated, ...prev]
+})
+
+================================================================================
+CLEANUP EN USEFFECT
+================================================================================
+
+Siempre limpiar las subscriptions cuando el componente se desmonta o cuando
+las dependencias cambian:
+
+useEffect(() => {
+    const observable = client.subscribe(...)
+    const subscription = observable.subscribe(...)
+
+    return () => {
+        subscription.unsubscribe()
+    }
+}, [dependencyThatTriggersResubscription])
+
+Si no se hace cleanup:
+- Memory leaks
+- Subscriptions huérfanas que siguen recibiendo eventos
+- Estados inconsistentes cuando el componente ya no existe
+
+================================================================================
+RESOLUCIÓN DE PROBLEMAS COMUNES
+================================================================================
+
+PROBLEMA: El componente muestra datos obsoletos después de un cambio
+CAUSA: La subscription no se re-suscribe cuando cambia el ID
+SOLUCIÓN: Agregar el ID a las dependencias del useEffect de subscription
+
+PROBLEMA: Veo duplicados en la lista
+CAUSA: Falta el check de duplicados o el servidor envía duplicates
+SOLUCIÓN: Verificar que existe check antes de prepend
+
+PROBLEMA: El estado local nunca se actualiza después del primer render
+CAUSA: La subscription no está llegando o el channel está mal
+SOLUCIÓN: Verificar en DevTools que llegan eventos en la subscription,
+          verificar que el canal de Redis PubSub es correcto
+
+PROBLEMA: Loop infinito de re-renders
+CAUSA: Usar `|| []` en el array de dependencias del useEffect
+SOLUCIÓN: Depender del objeto Apollo (ordersData) en vez de la propiedad
+          (`ordersData?.orders || []` en dependencias causa el problema)
+
+================================================================================
+RESUMEN DE REGLAS DE ORO
+================================================================================
+
+1. El estado local es la ÚNICA fuente de verdad para la UI
+2. La subscription hace PREPEND con check de duplicados
+3. El sync effect solo poblq el estado UNA VEZ al inicio
+4. El render usa el estado local, nunca data directamente
+5. Cleanup con unsubscribe() en cada useEffect de subscription
+6. Las dependencies del useEffect de subscription incluyen el ID del contexto
+7. fetchPolicy: 'cache-and-network' para queries iniciales
+
+================================================================================

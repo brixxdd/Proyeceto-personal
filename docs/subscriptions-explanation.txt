@@ -281,3 +281,404 @@ Backend ( order-service/src/services/order.service.ts ):
 - El cleanup del useEffect es crucial para evitar memory leaks
 
 ================================================================================
+
+
+================================================================================
+8. BUGS CONOCIDOS Y SUS FIXES (PATRONES CORRECTOS)
+================================================================================
+
+Este bloque documenta errores reales encontrados en produccion y el patron
+correcto para evitarlos. Tratarlo como un checklist antes de implementar
+cualquier feature de tiempo real.
+
+
+--------------------------------------------------------------------------------
+BUG 1: cache.modify no garantiza re-render
+--------------------------------------------------------------------------------
+
+SINTOMA:
+  - La subscription WebSocket llega (se ve en Network/WS)
+  - La UI no se actualiza (el stepper no avanza)
+  - Solo al recargar la pagina el estado se muestra correcto
+
+CAUSA:
+  client.cache.modify({
+    id: client.cache.identify({ __typename: 'Order', id }),  // puede NO encontrar la entrada
+    fields: {
+      status() { return updatedOrder.status },
+      updatedAt() { return updatedOrder.updatedAt },   // campo NO en el query original = no hace nada
+    }
+  })
+
+  Problemas:
+  1. cache.identify puede no encontrar el objeto si el ID no esta normalizado igual
+  2. cache.modify SOLO modifica campos ya existentes en cache; si updatedAt no fue
+     pedido en el GET_ORDER original, el modify lo ignora silenciosamente
+  3. Si Apollo no detecta cambio (mismo valor), no re-renderiza
+
+SOLUCION: useState local como fuente de verdad para la UI
+
+  // ✅ CORRECTO
+  const [currentOrder, setCurrentOrder] = useState(null)
+
+  // Subscription: setState directo -> React SIEMPRE re-renderiza
+  observable.subscribe({
+    next: ({ data }) => {
+      if (data?.orderStatusChanged) {
+        setCurrentOrder(prev => ({ ...prev, ...data.orderStatusChanged }))
+      }
+    }
+  })
+
+  // En el JSX usar currentOrder en vez de data?.order
+  const order = currentOrder
+
+REGLA: Nunca usar cache.modify para actualizaciones de UI criticas.
+       Usar useState + merge del payload de la subscription.
+
+
+--------------------------------------------------------------------------------
+BUG 2: Subscription recibe solo el primer evento (se congela despues)
+--------------------------------------------------------------------------------
+
+SINTOMA:
+  - PENDING -> CONFIRMED funciona en tiempo real ✅
+  - CONFIRMED -> PREPARING no llega (hay que recargar) ❌
+  - PREPARING -> READY tampoco llega ❌
+
+CAUSA:
+  PubSubAsyncIterator (graphql-subscriptions v2) usa iterall.$$asyncIterator.
+  graphql-ws v5 itera con Symbol.asyncIterator nativo. Hay incompatibilidad
+  de timing: si el segundo evento Redis llega mientras graphql-ws aun no llamo
+  next() de nuevo, el evento puede perderse dependiendo del estado interno del
+  iterador.
+
+  Ademas: Redis PubSub es "fire and forget". Si el upstream WebSocket (order-service)
+  cierra por idle timeout entre eventos, el canal Redis se pierde para siempre.
+
+SOLUCION: Patron hibrido subscription + polling como red de seguridad
+
+  // ✅ CORRECTO: subscription (instantanea) + polling (red de seguridad)
+  const { data } = useQuery(GET_ORDER, {
+    variables: { id },
+    fetchPolicy: 'network-only',
+    pollInterval: 4000,                   // max 4s de atraso si falla la subscription
+    notifyOnNetworkStatusChange: false,   // sin skeleton flash en cada poll
+  })
+
+  // El useEffect del query NO debe sobrescribir estado mas reciente de la subscription
+  useEffect(() => {
+    if (data?.order) {
+      setCurrentOrder(prev => {
+        if (prev && data.order.status !== prev.status) {
+          // Comparar timestamps para no revertir un estado mas nuevo
+          const pollTime = new Date(data.order.updatedAt || data.order.createdAt).getTime()
+          const prevTime = new Date(prev.updatedAt || prev.createdAt || 0).getTime()
+          if (pollTime > prevTime) return { ...prev, ...data.order }
+          return prev  // la subscription ya tiene datos mas frescos
+        }
+        return { ...prev, ...data.order }
+      })
+    }
+  }, [data])
+
+REGLA: Nunca depender exclusivamente de la subscription para estados criticos.
+       Siempre agregar pollInterval como fallback. 4-10s es un buen rango.
+
+
+--------------------------------------------------------------------------------
+BUG 3: Nombre del campo incorrecto en la subscription
+--------------------------------------------------------------------------------
+
+SINTOMA:
+  - La subscription no recibe ningun evento
+  - No hay error visible en consola (falla silenciosamente)
+  - O se ve error 400 en Network/WS
+
+CAUSA:
+  // ❌ INCORRECTO — nombre del microservice, no del Gateway
+  subscription OnNewOrder($restaurantId: ID!) {
+    restaurantOrderCreated(restaurantId: $restaurantId) { ... }
+  }
+
+  La arquitectura es:
+    Frontend --> API Gateway --> Order Service
+
+  El API Gateway es el PROXY del WebSocket. El frontend debe usar
+  los nombres definidos en api-gateway/schema.graphql, NO en los
+  schemas de los microservicios individuales.
+
+SOLUCION: Siempre verificar api-gateway/schema.graphql
+
+  # api-gateway/schema.graphql
+  type Subscription {
+    orderStatusChanged(orderId: ID!): Order!    # para tracking del cliente
+    newOrder(restaurantId: ID!): Order!         # para dashboard del restaurant
+    orderUpdated(orderId: ID!): Order!
+  }
+
+  // ✅ CORRECTO — usar el nombre del Gateway
+  subscription OnNewOrder($restaurantId: ID!) {
+    newOrder(restaurantId: $restaurantId) { ... }
+  }
+
+  // Y consumir con el mismo nombre:
+  next: ({ data }) => {
+    if (data?.newOrder) { ... }           // ✅
+    // if (data?.restaurantOrderCreated)  // ❌
+  }
+
+REGLA: El nombre del campo en el gql`` Y en data?.campo DEBEN coincidir
+       con api-gateway/schema.graphql. Nunca con el schema del microservicio.
+
+
+--------------------------------------------------------------------------------
+BUG 4: refetchOrders sin await causa race condition
+--------------------------------------------------------------------------------
+
+SINTOMA:
+  - Dashboard muestra estado viejo despues de actualizar el status
+  - El estado correcto aparece solo al recargar o unos segundos despues
+
+CAUSA:
+  async function handleStatusUpdate(orderId, newStatus) {
+    await updateOrderStatus({ variables: { id: orderId, status: newStatus } })
+    refetchOrders()   // ❌ fire-and-forget: no espera a que termine
+  }
+
+  Sin await, la funcion retorna inmediatamente. El usuario ve el boton habilitado
+  de nuevo pero los datos no se actualizaron aun en el estado local.
+
+SOLUCION:
+
+  // ✅ CORRECTO
+  async function handleStatusUpdate(orderId, newStatus) {
+    await updateOrderStatus({ variables: { id: orderId, status: newStatus } })
+    await refetchOrders()   // espera datos frescos del servidor
+  }
+
+REGLA: Si la UI depende del resultado del refetch, siempre usar await.
+
+
+================================================================================
+9. CAMBIO DE CUENTA: LIMPIEZA DE CACHE Y ESTADO
+================================================================================
+
+PROBLEMA:
+  Al hacer logout y login con otra cuenta, Apollo Cache retiene datos
+  del usuario anterior (myRestaurants, restaurantOrders, menu, etc.).
+  El nuevo usuario hereda el selectedRestaurantId del anterior y el
+  backend retorna: "Forbidden: you do not own this restaurant".
+
+FLUJO DEL BUG:
+  Cuenta A (restaurante X) -> logout -> login Cuenta B (restaurante Y)
+        |
+        v
+  Apollo cache: aun tiene restaurante X + sus ordenes
+        |
+        v
+  selectedRestaurantId: null -> auto-selecciona restaurante Y
+  (pero cache puede servir ordenes del restaurante X)
+        |
+        v
+  Backend: Cuenta B no es duena del restaurante X -> ❌ Forbidden
+
+
+FIX 1: Limpiar Apollo Cache en el logout
+
+  // ❌ INCORRECTO - solo borra el token, cache queda sucio
+  function handleLogout() {
+    sessionStorage.removeItem('token')
+    sessionStorage.removeItem('user_role')
+    navigate('/login')
+  }
+
+  // ✅ CORRECTO - limpiar cache antes de navegar
+  const client = useApolloClient()
+
+  function handleLogout() {
+    sessionStorage.removeItem('token')
+    sessionStorage.removeItem('user_role')
+    client.clearStore().finally(() => {
+      navigate('/login')
+    })
+  }
+
+  NOTA: clearStore() es asincrono (purga todo el InMemoryCache + queries activos).
+        Usar .finally() garantiza que la navegacion ocurre aunque clearStore falle.
+        Alternativa: client.resetStore() — limpia Y re-ejecuta queries activos
+        (mas agresivo, puede causar requests no deseados en la pantalla de login).
+
+
+FIX 2: Resetear estado local del Dashboard cuando cambia el usuario
+
+  // En RestaurantDashboard (o cualquier pagina con estado local derivado del user)
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState(null)
+  const [localOrders, setLocalOrders] = useState([])
+
+  // ✅ Resetear cuando Apollo retorna datos del nuevo usuario
+  useEffect(() => {
+    setSelectedRestaurantId(null)   // evita heredar restaurantId del usuario anterior
+    setLocalOrders([])              // limpia ordenes de la sesion anterior
+  }, [restaurantsData])             // restaurantsData cambia cuando Apollo recibe nueva respuesta
+
+  // Auto-seleccionar el primer restaurante del NUEVO usuario
+  useEffect(() => {
+    if (!restaurantsLoading && restaurants.length > 0 && !selectedRestaurantId) {
+      setSelectedRestaurantId(restaurants[0].id)
+    }
+  }, [restaurantsLoading, restaurants, selectedRestaurantId])
+
+  ORDEN IMPORTANTE: El primer useEffect (reset) DEBE declararse ANTES del segundo
+  (auto-select) para que React los ejecute en orden correcto.
+
+REGLA: clearStore() en logout + resetear estado local en el componente.
+       Ambos son necesarios; uno solo no es suficiente.
+
+
+================================================================================
+10. PATRON COMPLETO: SUBSCRIPTION + POLLING HIBRIDO (RECOMENDADO)
+================================================================================
+
+Este es el patron definitivo para paginas con datos en tiempo real.
+Combina:
+  - useQuery con pollInterval (carga inicial + red de seguridad)
+  - useState local (fuente de verdad para la UI)
+  - client.subscribe manual (actualizacion instantanea por WebSocket)
+
+  // 1. Estado local — fuente de verdad para la UI
+  const [currentOrder, setCurrentOrder] = useState(null)
+
+  // 2. Query con polling como red de seguridad
+  //    fetchPolicy: 'network-only' evita servir datos viejos del cache
+  //    notifyOnNetworkStatusChange: false evita skeleton flash en cada poll
+  const { data, loading, error } = useQuery(GET_ORDER, {
+    variables: { id },
+    fetchPolicy: 'network-only',
+    pollInterval: 4000,
+    notifyOnNetworkStatusChange: false,
+  })
+
+  // 3. Sincronizar query al estado local (con proteccion de timestamp)
+  useEffect(() => {
+    if (data?.order) {
+      setCurrentOrder(prev => {
+        if (prev && data.order.status !== prev.status) {
+          const pollTime = new Date(data.order.updatedAt || data.order.createdAt).getTime()
+          const prevTime = new Date(prev.updatedAt || prev.createdAt || 0).getTime()
+          if (pollTime > prevTime) return { ...prev, ...data.order }
+          return prev
+        }
+        return { ...prev, ...data.order }
+      })
+    }
+  }, [data])
+
+  // 4. Subscription: actualizacion instantanea (el poll es solo la red de seguridad)
+  useEffect(() => {
+    if (!id) return
+
+    const observable = client.subscribe({
+      query: ORDER_STATUS_SUBSCRIPTION,    // campo del GATEWAY, no del microservicio
+      variables: { orderId: id },
+    })
+
+    const sub = observable.subscribe({
+      next: ({ data: subData }) => {
+        if (subData?.orderStatusChanged) {
+          // setState directo: siempre re-renderiza, sin depender de cache keys
+          setCurrentOrder(prev => ({ ...prev, ...subData.orderStatusChanged }))
+        }
+      },
+      error: (err) => console.error('[OrderTracking] Subscription error:', err)
+    })
+
+    return () => sub.unsubscribe()   // cleanup obligatorio para evitar memory leaks
+  }, [id, client])
+
+  // 5. En el JSX: usar currentOrder (estado local), no data?.order
+  const order = currentOrder
+
+
+================================================================================
+11. CHECKLIST ANTES DE IMPLEMENTAR TIEMPO REAL
+================================================================================
+
+Verificar cada punto antes de hacer PR:
+
+SUBSCRIPTION:
+  [ ] El campo en el gql`` coincide con api-gateway/schema.graphql (no con el microservice)
+  [ ] data?.campoGateway usa el mismo nombre (no data?.campoMicroservice)
+  [ ] El useEffect tiene cleanup: return () => subscription.unsubscribe()
+  [ ] Las deps del useEffect NO usan || [] (usar useMemo o depender del objeto Apollo)
+
+ESTADO LOCAL:
+  [ ] Se usa useState como fuente de verdad para la UI (NO data?.field directamente)
+  [ ] El setState en la subscription usa spread: prev => ({ ...prev, ...newData })
+  [ ] El useEffect del query tiene proteccion de timestamp si hay subscription activa
+
+POLLING:
+  [ ] pollInterval esta en el useQuery, NO en un setInterval manual aparte
+  [ ] notifyOnNetworkStatusChange: false para evitar skeleton flash
+  [ ] fetchPolicy: 'network-only' si los datos deben ser siempre frescos
+
+SESION / AUTH:
+  [ ] El logout llama client.clearStore() antes de navegar a /login
+  [ ] Los estados locales derivados del usuario (selectedId, localOrders, etc.)
+      se resetean cuando restaurantsData / userData cambia
+  [ ] El reset de estado esta en un useEffect separado del auto-select
+
+MUTATIONS:
+  [ ] refetch() despues de mutation usa await si la UI depende del resultado
+  [ ] No se llama refetch() en paralelo con la subscription (evitar race condition)
+
+
+================================================================================
+12. REFERENCIA CRITICA: NOMBRES DE CAMPOS SUBSCRIPTIONS vs HTTP
+================================================================================
+
+⚠️  REGLA MAS IMPORTANTE DE ESTE PROYECTO:
+
+El API Gateway maneja DOS tipos de operaciones con reglas DISTINTAS:
+
+  HTTP (queries y mutations):
+    → Apollo Federation procesa y enruta
+    → Usar los nombres del api-gateway/schema.graphql (supergraph)
+
+  WebSocket (subscriptions):
+    → Gateway es PROXY PURO — pasa mensajes byte-for-byte al order-service
+    → El order-service resuelve directamente
+    → Usar los nombres de services/order-service/src/index.ts (resolvers reales)
+
+TABLA DE NOMBRES CORRECTOS PARA EL FRONTEND:
+
+  Campo en el frontend gql``           Donde esta definido
+  -----------------------------------  -----------------------------------
+  restaurantOrderCreated(restaurantId) order-service/src/index.ts  ✅ WS
+  orderStatusChanged(orderId)          order-service/src/index.ts  ✅ WS
+  orderUpdated(orderId)                order-service/src/index.ts  ✅ WS
+  myOrdersUpdated                      order-service/src/index.ts  ✅ WS
+
+  newOrder(restaurantId)               api-gateway/schema.graphql  ❌ NO EXISTE en order-service
+                                       (nombre solo del supergraph, no llega por WS)
+
+POR QUE "newOrder" PARECE CORRECTO PERO NO LO ES:
+  - api-gateway/schema.graphql define "newOrder" para el supergraph HTTP federado
+  - Pero el gateway WebSocket es un proxy raw — no "traduce" nombres
+  - El browser envia { field: "newOrder" } → gateway lo pasa tal cual al order-service
+  - El order-service no tiene resolver "newOrder" → subscription falla silenciosamente
+
+COMO VERIFICAR EL NOMBRE CORRECTO:
+  # Resolver registrado en el order-service (fuente de verdad para WS)
+  grep -A2 "Subscription:" services/order-service/src/index.ts
+
+  # Supergraph del gateway (solo valido para HTTP)
+  grep -A5 "type Subscription" services/api-gateway/schema.graphql
+
+BUG REAL QUE OCURRIO:
+  Se cambio la subscription de "restaurantOrderCreated" a "newOrder"
+  basandose en el schema del gateway. La subscription dejó de funcionar
+  silenciosamente — ningun evento llegaba al Dashboard sin recargar.
+  Revertir a "restaurantOrderCreated" (nombre del order-service resolver) lo arreglo.
+
+================================================================================

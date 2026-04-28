@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Home, UtensilsCrossed, ShoppingBag, ShoppingCart, User, LogOut, Flame, LayoutDashboard } from 'lucide-react'
 import ThemeToggle from '../ui/ThemeToggle'
 import { useCart } from '../../context/CartContext'
+import { useApolloClient } from '@apollo/client/react'
 
 // Nav link component with active state
 function NavLink({
@@ -48,10 +49,16 @@ export default function Navbar() {
   const isOwner = role === 'RESTAURANT_OWNER' || role === 'ADMIN'
   const isDelivery = role === 'DELIVERY_PERSON'
 
+  const client = useApolloClient()
+
   function handleLogout() {
     sessionStorage.removeItem('token')
     sessionStorage.removeItem('user_role')
-    navigate('/login')
+    // Limpiar el cache de Apollo: evita que el nuevo usuario
+    // vea datos (restaurantes, pedidos) de la sesion anterior
+    client.clearStore().finally(() => {
+      navigate('/login')
+    })
   }
 
   const ordersLink = isOwner ? '/dashboard' : '/orders'

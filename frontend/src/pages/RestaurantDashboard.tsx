@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useApolloClient } from '@apollo/client/react'
 import { gql } from '@apollo/client'
@@ -56,6 +56,11 @@ const GET_STATS = gql`
 `
 
 // Subscriptions for real-time updates
+// IMPORTANTE: El Gateway es proxy WebSocket PURO — pasa mensajes byte-for-byte
+// al order-service. Usar el nombre del campo del ORDER-SERVICE (src/index.ts),
+// NO el nombre del supergraph de api-gateway/schema.graphql.
+//   order-service resolver: restaurantOrderCreated  ← CORRECTO para subscriptions
+//   api-gateway supergraph: newOrder                ← solo para HTTP queries federadas
 const RESTAURANT_ORDER_CREATED = gql`
   subscription OnRestaurantOrderCreated($restaurantId: ID!) {
     restaurantOrderCreated(restaurantId: $restaurantId) {
@@ -154,12 +159,15 @@ export default function RestaurantDashboard() {
     const [showNewItemForm, setShowNewItemForm] = useState(false)
     const [editingItem, setEditingItem] = useState<any>(null)
 
-    // Data fetching without polling - rely on subscriptions for real-time updates
+    // Data fetching: subscriptions para actualizaciones instantaneas,
+    // pollInterval como red de seguridad si la subscription pierde algun evento.
     const { data: restaurantsData, loading: restaurantsLoading, error: restaurantsError, refetch: refetchRestaurants } = useQuery<any>(GET_MY_RESTAURANTS)
     const { data: ordersData, loading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery<any>(GET_RESTAURANT_ORDERS, {
         variables: { restaurantId: selectedRestaurantId, status: filterStatus || undefined },
         skip: !selectedRestaurantId,
         fetchPolicy: 'cache-and-network',
+        pollInterval: 8000,                   // red de seguridad: actualiza cada 8s
+        notifyOnNetworkStatusChange: false,   // sin skeleton flash en cada poll
     })
     const { data: menuData, loading: menuLoading, refetch: refetchMenu } = useQuery<any>(GET_MENU, {
         variables: { restaurantId: selectedRestaurantId },
@@ -189,9 +197,9 @@ export default function RestaurantDashboard() {
 
         const newOrderSubscription = newOrderObservable.subscribe({
             next: ({ data }) => {
+                // El proxy pasa el mensaje al order-service que resuelve restaurantOrderCreated
                 if (data?.restaurantOrderCreated) {
                     const newOrder = data.restaurantOrderCreated
-                    // Prepend new order to local state
                     setLocalOrders(prev => {
                         const exists = prev.some(o => o.id === newOrder.id)
                         if (exists) return prev
@@ -240,7 +248,24 @@ export default function RestaurantDashboard() {
     // Use localOrders for display (subscription handles real-time updates)
     const orders = localOrders
 
-    // Auto-select first restaurant
+    // Detectar cambio de cuenta comparando IDs anteriores vs nuevos.
+    // Solo resetear si NO hay ningun ID en comun (usuario completamente diferente).
+    // Esto evita limpiar ordenes por refetches normales del mismo usuario.
+    const prevRestaurantIdsRef = useRef<Set<string>>(new Set())
+    useEffect(() => {
+        if (!restaurantsData?.myRestaurants) return
+        const newIds = new Set<string>(restaurantsData.myRestaurants.map((r: any) => r.id))
+        const prevIds = prevRestaurantIdsRef.current
+        const hasOverlap = [...newIds].some(id => prevIds.has(id))
+        // Si habia restaurantes previos y ninguno coincide = cambio de cuenta
+        if (prevIds.size > 0 && !hasOverlap) {
+            setSelectedRestaurantId(null)
+            setLocalOrders([])
+        }
+        prevRestaurantIdsRef.current = newIds
+    }, [restaurantsData])
+
+    // Auto-seleccionar el primer restaurante cuando no hay ninguno seleccionado
     useEffect(() => {
         if (!restaurantsLoading && restaurants.length > 0 && !selectedRestaurantId) {
             setSelectedRestaurantId(restaurants[0].id)
@@ -257,7 +282,7 @@ export default function RestaurantDashboard() {
 
     async function handleStatusUpdate(orderId: string, newStatus: string) {
         await updateOrderStatus({ variables: { id: orderId, status: newStatus } })
-        refetchOrders()
+        await refetchOrders()
     }
 
     async function handleToggleOpen() {

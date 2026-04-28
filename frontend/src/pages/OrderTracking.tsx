@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import { CheckCircle, Truck, ChefHat, Package, Clock, ArrowLeft, RefreshCw } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
 import { slideUp, staggerContainer } from '../lib/animations'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 const GET_ORDER = gql`
   query GetOrder($id: ID!) {
@@ -15,6 +15,7 @@ const GET_ORDER = gql`
       totalAmount
       restaurantId
       createdAt
+      updatedAt
       items {
         id
         menuItemId
@@ -73,12 +74,42 @@ export default function OrderTracking() {
   const { id } = useParams<{ id: string }>()
   const client = useApolloClient()
 
-  // Initial order data via query
+  // useState local como fuente de verdad para la UI
+  // Garantiza re-render inmediato al recibir eventos de subscription
+  const [currentOrder, setCurrentOrder] = useState<any>(null)
+
+  // Query con polling corto como red de seguridad:
+  // La subscription WebSocket es el mecanismo principal (instantáneo),
+  // pero el polling garantiza que ningún cambio de estado se pierda
+  // si el Redis PubSub pierde un evento por timing.
   const { data, loading, error } = useQuery<any>(GET_ORDER, {
     variables: { id },
+    fetchPolicy: 'network-only',
+    pollInterval: 4000,                    // red de seguridad: refresca cada 4s
+    notifyOnNetworkStatusChange: false,    // sin skeleton flash en cada poll
   })
 
-  // Set up robust manual subscription
+  // Sincronizar datos del query al state local (solo cuando Apollo retorna datos reales).
+  // El spread garantiza que los datos de la subscription (más frescos) no sean pisados
+  // si llegan antes del próximo poll.
+  useEffect(() => {
+    if (data?.order) {
+      setCurrentOrder((prev: any) => {
+        // Si la subscription ya actualizó el estado a algo más reciente,
+        // no revertirlo con datos más viejos del poll
+        if (prev && data.order.status !== prev.status) {
+          // Usar updatedAt para determinar cuál es más reciente
+          const pollTime = new Date(data.order.updatedAt || data.order.createdAt).getTime()
+          const prevTime = new Date(prev.updatedAt || prev.createdAt || 0).getTime()
+          if (pollTime > prevTime) return { ...prev, ...data.order }
+          return prev  // la subscription ya tiene datos más frescos
+        }
+        return { ...prev, ...data.order }
+      })
+    }
+  }, [data])
+
+  // Subscription: actualizar estado directamente → siempre dispara re-render
   useEffect(() => {
     if (!id) return
 
@@ -88,23 +119,18 @@ export default function OrderTracking() {
     })
 
     const subscription = observable.subscribe({
-      next: ({ data }) => {
-        if (data?.orderStatusChanged) {
-          const updatedOrder = data.orderStatusChanged
-
-          // Modify cache directly - this guarantees useQuery will trigger a re-render
-          client.cache.modify({
-            id: client.cache.identify({ __typename: 'Order', id }),
-            fields: {
-              status() { return updatedOrder.status },
-              updatedAt() { return updatedOrder.updatedAt },
-              totalAmount() { return updatedOrder.totalAmount },
-            }
-          })
+      next: ({ data: subData }) => {
+        if (subData?.orderStatusChanged) {
+          const updatedOrder = subData.orderStatusChanged
+          // setState directo: React siempre re-renderiza, sin depender de cache keys
+          setCurrentOrder((prev: any) => ({
+            ...prev,
+            ...updatedOrder,
+          }))
         }
       },
       error: (err) => {
-        console.error('Subscription error:', err)
+        console.error('[OrderTracking] Subscription error:', err)
       }
     })
 
@@ -113,7 +139,7 @@ export default function OrderTracking() {
     }
   }, [id, client])
 
-  const order = data?.order
+  const order = currentOrder
 
   if (loading && !order) return (
     <PageTransition>
