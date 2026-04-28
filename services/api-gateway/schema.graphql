@@ -139,6 +139,56 @@ enum VehicleType {
   WALKING
 }
 
+enum DriverStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+}
+
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+type Location {
+  latitude: Float!
+  longitude: Float!
+}
+
+input LocationInput {
+  latitude: Float!
+  longitude: Float!
+}
+
+type DeliveryPerson {
+  id: ID!
+  user: User
+  userId: String
+  name: String!
+  status: DriverStatus!
+  vehicleType: VehicleType!
+  rating: Float!
+  currentLocation: Location
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Delivery {
+  id: ID!
+  orderId: ID!
+  deliveryPersonId: ID!
+  status: DeliveryStatus!
+  pickupTime: DateTime
+  deliveryTime: DateTime
+  currentLocation: Location
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
 """
 Autenticación
 """
@@ -194,6 +244,9 @@ type Query {
     radius: Float = 5.0
   ): [DeliveryPerson!]!
   deliveryPerson(id: ID!): DeliveryPerson
+  myDeliveryPerson(userId: ID!): DeliveryPerson
+  myDeliveries(deliveryPersonId: ID!): [Delivery!]!
+  availableDeliveries: [Delivery!]!
 }
 
 # Mutations
@@ -255,6 +308,10 @@ type Mutation {
     orderId: ID!
     status: OrderStatus!
   ): Order!
+  createDeliveryPerson(userId: ID!, name: String!, vehicleType: VehicleType!): DeliveryPerson!
+  updateDriverStatus(id: ID!, status: DriverStatus!, location: LocationInput): DeliveryPerson!
+  updateDeliveryStatus(id: ID!, status: DeliveryStatus!): Delivery!
+  acceptDelivery(orderId: ID!, deliveryPersonId: ID!): Delivery!
 }
 
 # Subscriptions
@@ -264,6 +321,10 @@ type Subscription {
   orderStatusChanged(orderId: ID!): Order!
   newOrder(restaurantId: ID!): Order!
   orderUpdated(orderId: ID!): Order!
+  # Delivery
+  newAvailableDelivery: Delivery!
+  myDeliveryUpdates(deliveryPersonId: ID!): Delivery!
+  deliveryStatusChanged(deliveryId: ID!): Delivery!
 }
 
 # Input Types

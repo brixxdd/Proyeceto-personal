@@ -13,7 +13,7 @@ import {
 } from '../models/delivery.model';
 
 export class DeliveryRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly pool: Pool) { }
 
   // ── DeliveryPerson ────────────────────────────────────────────────────────
 
@@ -48,6 +48,15 @@ export class DeliveryRepository {
       "SELECT * FROM delivery_people WHERE status = 'AVAILABLE' ORDER BY rating DESC",
     );
     return result.rows.map(mapDeliveryPerson);
+  }
+
+  async findAvailableDeliveries(): Promise<Delivery[]> {
+    const result = await this.pool.query<DeliveryRow>(
+      `SELECT d.* FROM deliveries d
+       WHERE d.status = 'PENDING' AND d.delivery_person_id IS NULL
+       ORDER BY d.created_at ASC`,
+    );
+    return result.rows.map(mapDelivery);
   }
 
   async updateDriverStatus(
@@ -132,6 +141,23 @@ export class DeliveryRepository {
     return mapDelivery(result.rows[0]);
   }
 
+  async createPendingDelivery(orderId: string): Promise<Delivery> {
+    const result = await this.pool.query<DeliveryRow>(
+      `INSERT INTO deliveries (order_id, delivery_person_id, status)
+       VALUES ($1, NULL, 'PENDING')
+       ON CONFLICT (order_id) DO NOTHING
+       RETURNING *`,
+      [orderId],
+    );
+    if (result.rows.length === 0) {
+      // Already exists, try to find it
+      const existing = await this.findDeliveryByOrderId(orderId);
+      if (!existing) throw new Error(`Could not create or find delivery for order ${orderId}`);
+      return existing;
+    }
+    return mapDelivery(result.rows[0]);
+  }
+
   async updateDeliveryStatus(id: string, status: DeliveryStatus): Promise<Delivery | null> {
     let extraSet = '';
     if (status === 'PICKED_UP') {
@@ -190,6 +216,22 @@ export class DeliveryRepository {
        WHERE id = $1
        RETURNING *`,
       [data.id, data.deliveryPersonId, data.status],
+    );
+    if (result.rows.length === 0) return null;
+    return mapDelivery(result.rows[0]);
+  }
+
+  /**
+   * Atomically claim a PENDING delivery for a driver using row-level locking.
+   * Returns the delivery if successfully claimed, null if already taken.
+   */
+  async claimDelivery(deliveryId: string, deliveryPersonId: string): Promise<Delivery | null> {
+    const result = await this.pool.query<DeliveryRow>(
+      `UPDATE deliveries
+       SET delivery_person_id = $2, status = 'ASSIGNED', updated_at = NOW()
+       WHERE id = $1 AND status = 'PENDING' AND delivery_person_id IS NULL
+       RETURNING *`,
+      [deliveryId, deliveryPersonId],
     );
     if (result.rows.length === 0) return null;
     return mapDelivery(result.rows[0]);

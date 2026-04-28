@@ -88,3 +88,6 @@ export const driverAssignedChannel = (orderId: string) => `delivery:driver-assig
 
 /** Channel for a delivery person's assigned deliveries updates */
 export const myDeliveryUpdatesChannel = (deliveryPersonId: string) => `delivery:my-updates:${deliveryPersonId}`;
+
+/** Channel for new available deliveries (broadcasts to ALL delivery people) */
+export const newAvailableDeliveryChannel = () => 'delivery:new-available';

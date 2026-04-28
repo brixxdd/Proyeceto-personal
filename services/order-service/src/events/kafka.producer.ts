@@ -22,6 +22,14 @@ export interface OrderDeliveredEvent {
   timestamp: string;
 }
 
+export interface OrderReadyEvent {
+  orderId: string;
+  customerId: string;
+  restaurantId: string;
+  totalAmount: number;
+  timestamp: string;
+}
+
 /**
  * Resultado de intentar publicar un evento
  */
@@ -36,11 +44,12 @@ export class KafkaProducer {
   private readonly ORDER_CREATED_TOPIC = process.env.KAFKA_TOPIC_ORDER_CREATED || 'order.created';
   private readonly ORDER_ASSIGNED_TOPIC = process.env.KAFKA_TOPIC_ORDER_ASSIGNED || 'order.assigned';
   private readonly ORDER_DELIVERED_TOPIC = process.env.KAFKA_TOPIC_ORDER_DELIVERED || 'order.delivered';
+  private readonly ORDER_READY_TOPIC = process.env.KAFKA_TOPIC_ORDER_READY || 'order.ready';
 
   constructor(
     private producer: Producer,
     private idempotency?: IdempotencyService,
-  ) {}
+  ) { }
 
   async publishOrderCreated(event: OrderCreatedEvent): Promise<PublishResult> {
     const eventId = uuidv4();
@@ -137,6 +146,39 @@ export class KafkaProducer {
       return { success: true, eventId };
     } catch (error) {
       logger.error('Failed to publish order.delivered event', error);
+      return { success: false, eventId, error: String(error) };
+    }
+  }
+
+  async publishOrderReady(event: OrderReadyEvent): Promise<PublishResult> {
+    const eventId = uuidv4();
+
+    if (this.idempotency) {
+      const isRecorded = await this.idempotency.tryRecordEvent(eventId);
+      if (!isRecorded) {
+        return { success: false, eventId, isDuplicate: true };
+      }
+    }
+
+    try {
+      await this.producer.send({
+        topic: this.ORDER_READY_TOPIC,
+        messages: [
+          {
+            key: event.orderId,
+            value: JSON.stringify(event),
+            headers: {
+              eventId,
+              eventType: 'order.ready',
+              timestamp: event.timestamp,
+            },
+          },
+        ],
+      });
+      logger.info(`Published order.ready event for order ${event.orderId} (eventId: ${eventId})`);
+      return { success: true, eventId };
+    } catch (error) {
+      logger.error('Failed to publish order.ready event', error);
       return { success: false, eventId, error: String(error) };
     }
   }

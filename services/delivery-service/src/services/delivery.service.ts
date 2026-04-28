@@ -1,7 +1,7 @@
 import { Delivery, DeliveryPerson, DeliveryStatus, DriverStatus, Location, VehicleType } from '../models/delivery.model';
 import { DeliveryRepository } from '../repositories/delivery.repository';
 import { KafkaProducer } from '../events/kafka.producer';
-import { RedisPubSub, deliveryStatusChannel, driverAssignedChannel, myDeliveryUpdatesChannel } from '../pubsub/redis.pubsub';
+import { RedisPubSub, deliveryStatusChannel, driverAssignedChannel, myDeliveryUpdatesChannel, newAvailableDeliveryChannel } from '../pubsub/redis.pubsub';
 import { logger } from '../utils/logger';
 import { deliveryAssignmentsTotal, activeDeliveries, availableDrivers } from '../metrics/prometheus';
 
@@ -10,7 +10,7 @@ export class DeliveryService {
     private readonly repo: DeliveryRepository,
     private readonly kafkaProducer: KafkaProducer,
     private readonly pubSub: RedisPubSub,
-  ) {}
+  ) { }
 
   /**
    * Picks a random available driver, creates a delivery record, and sets the
@@ -41,6 +41,9 @@ export class DeliveryService {
 
     // Publish GraphQL subscription event
     await this.pubSub.publish(driverAssignedChannel(orderId), delivery);
+
+    // Broadcast to ALL delivery people that a new delivery is available
+    await this.pubSub.publish(newAvailableDeliveryChannel(), delivery);
 
     // Update Prometheus metrics
     deliveryAssignmentsTotal.inc({ status: 'ASSIGNED' });
@@ -119,6 +122,10 @@ export class DeliveryService {
     return this.repo.findAvailableDrivers();
   }
 
+  async getAvailableDeliveries(): Promise<Delivery[]> {
+    return this.repo.findAvailableDeliveries();
+  }
+
   async getDeliveryById(id: string): Promise<Delivery | null> {
     return this.repo.findDeliveryById(id);
   }
@@ -139,33 +146,43 @@ export class DeliveryService {
     return this.repo.createDeliveryPerson({ userId, name, vehicleType });
   }
 
+  /**
+   * Creates a PENDING delivery record when an order becomes READY.
+   * Broadcasts the new available delivery to all delivery people via Redis PubSub.
+   */
+  async createPendingDelivery(orderId: string): Promise<Delivery | null> {
+    const existing = await this.repo.findDeliveryByOrderId(orderId);
+    if (existing) {
+      // Already exists, no need to create again
+      return existing;
+    }
+
+    const delivery = await this.repo.createPendingDelivery(orderId);
+    if (delivery) {
+      await this.pubSub.publish(newAvailableDeliveryChannel(), delivery);
+      const avail = await this.repo.countAvailableDrivers();
+      availableDrivers.set(avail);
+    }
+
+    return delivery;
+  }
+
   async getMyDeliveries(deliveryPersonId: string): Promise<Delivery[]> {
     return this.repo.findDeliveries({ deliveryPersonId });
   }
 
   async acceptDelivery(deliveryId: string, deliveryPersonId: string): Promise<Delivery> {
-    const delivery = await this.repo.findDeliveryById(deliveryId);
+    // Use atomic claim — DB-level check ensures only ONE driver gets the delivery
+    const delivery = await this.repo.claimDelivery(deliveryId, deliveryPersonId);
     if (!delivery) {
-      throw new Error(`Delivery ${deliveryId} not found`);
-    }
-    if (delivery.status !== 'PENDING') {
-      throw new Error(`Delivery ${deliveryId} is not available for acceptance`);
-    }
-
-    const updated = await this.repo.updateDelivery({
-      id: deliveryId,
-      deliveryPersonId,
-      status: 'ASSIGNED',
-    });
-
-    if (!updated) {
-      throw new Error(`Failed to accept delivery ${deliveryId}`);
+      throw new Error(`Delivery ${deliveryId} is no longer available`);
     }
 
     await this.repo.updateDriverStatus(deliveryPersonId, 'BUSY');
-    await this.pubSub.publish(deliveryStatusChannel(deliveryId), updated);
+    await this.pubSub.publish(deliveryStatusChannel(deliveryId), delivery);
+    await this.pubSub.publish(myDeliveryUpdatesChannel(deliveryPersonId), delivery);
 
-    return updated;
+    return delivery;
   }
 
   async getDeliveries(filters: {

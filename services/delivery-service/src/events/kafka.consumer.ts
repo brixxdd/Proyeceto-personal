@@ -14,6 +14,14 @@ interface OrderCancelledPayload {
   timestamp?: string;
 }
 
+interface OrderReadyPayload {
+  orderId: string;
+  customerId: string;
+  restaurantId: string;
+  totalAmount: number;
+  timestamp?: string;
+}
+
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   maxRetries = 3,
@@ -40,18 +48,21 @@ export class KafkaConsumer {
     process.env.KAFKA_TOPIC_ORDER_CREATED || 'order.created';
   private readonly ORDER_CANCELLED_TOPIC =
     process.env.KAFKA_TOPIC_ORDER_CANCELLED || 'order.cancelled';
+  private readonly ORDER_READY_TOPIC =
+    process.env.KAFKA_TOPIC_ORDER_READY || 'order.ready';
   private readonly ORDER_CREATED_DLQ = 'order.created.dlq';
   private readonly ORDER_CANCELLED_DLQ = 'order.cancelled.dlq';
+  private readonly ORDER_READY_DLQ = 'order.ready.dlq';
 
   constructor(
     private readonly consumer: Consumer,
     private readonly deliveryService: DeliveryService,
     private readonly producer?: Producer,
-  ) {}
+  ) { }
 
   async start(): Promise<void> {
     await this.consumer.subscribe({
-      topics: [this.ORDER_CREATED_TOPIC, this.ORDER_CANCELLED_TOPIC],
+      topics: [this.ORDER_CREATED_TOPIC, this.ORDER_CANCELLED_TOPIC, this.ORDER_READY_TOPIC],
       fromBeginning: false,
     });
 
@@ -70,7 +81,9 @@ export class KafkaConsumer {
 
         const dlqTopic = topic === this.ORDER_CREATED_TOPIC
           ? this.ORDER_CREATED_DLQ
-          : this.ORDER_CANCELLED_DLQ;
+          : topic === this.ORDER_CANCELLED_TOPIC
+            ? this.ORDER_CANCELLED_DLQ
+            : this.ORDER_READY_DLQ;
 
         try {
           await retryWithBackoff(async () => {
@@ -78,6 +91,8 @@ export class KafkaConsumer {
               await this.handleOrderCreated(payload as OrderCreatedPayload);
             } else if (topic === this.ORDER_CANCELLED_TOPIC) {
               await this.handleOrderCancelled(payload as OrderCancelledPayload);
+            } else if (topic === this.ORDER_READY_TOPIC) {
+              await this.handleOrderReady(payload as OrderReadyPayload);
             }
           });
         } catch (error) {
@@ -134,6 +149,17 @@ export class KafkaConsumer {
     const { orderId } = event;
     logger.info(`Handling order.cancelled event for order ${orderId}`);
     await this.deliveryService.cancelDelivery(orderId);
+  }
+
+  private async handleOrderReady(event: OrderReadyPayload): Promise<void> {
+    const { orderId } = event;
+    logger.info(`Handling order.ready event for order ${orderId}`);
+    // On READY, create a PENDING delivery record (no driver assigned yet)
+    // Drivers can then claim it via acceptDelivery
+    const delivery = await this.deliveryService.createPendingDelivery(orderId);
+    if (delivery) {
+      logger.info(`Created pending delivery ${delivery.id} for order ${orderId}`);
+    }
   }
 
   async disconnect(): Promise<void> {

@@ -134,39 +134,46 @@ ORDEN RECOMENDADO DE IMPLEMENTACIÓN
 8. [ ] rejectDeliveryOrder mutation
 
 ================================================================================
-PENDIENTE MAÑANA: ACEPTAR PEDIDOS DESDE DELIVERY DASHBOARD
+✅ COMPLETADO: ACEPTAR PEDIDOS DESDE DELIVERY DASHBOARD
 ================================================================================
 
-Contexto:
-- Hay pedidos en status READY/CONFIRMED sin delivery_person_id asignado
-- El delivery person necesita ver pedidos disponibles y aceptarlos
-- currently myDeliveries solo muestra pedidos YA asignados
+Implementado: 2026-04-28
 
-FLUJO PLANEADO:
-1. order-service publica evento "order.ready" a Kafka cuando pedido pasa a READY
-2. delivery-service consume el evento y crea delivery record automáticamente
-3. El delivery person ve los pedidos disponibles en su dashboard
-4. Puede hacer acceptDelivery(deliveryId) para asignarse el pedido
+FLUJO IMPLEMENTADO:
+1. order-service publica evento "order.ready" a Kafka cuando pedido pasa a READY ✓
+2. delivery-service consume el evento y crea delivery record con status PENDING ✓
+3. El delivery person ve los pedidos disponibles en "Pedidos Disponibles" ✓
+4. Puede hacer acceptDelivery(deliveryId, deliveryPersonId) para asignarse el pedido ✓
+5. Si varios drivers compiten, el primero en DB gana (atomic claim) ✓
+6. Todos ven los pedidos en tiempo real via GraphQL subscription ✓
 
-ARCHIVOS A TOCAR:
+ARCHIVOS MODIFICADOS:
 
 Backend:
-- order-service/src/events/kafka.producer.ts → agregar publishOrderReady()
-- order-service/src/index.ts → publicar evento cuando order pasa a READY
-- order-service/src/services/order.service.ts → llamar publishOrderReady
-- delivery-service/src/events/kafka.consumer.ts → consumir order.ready, crear delivery
-- delivery-service/schema.graphql → agregar query availableDeliveries
-- delivery-service/src/resolvers/delivery.resolver.ts → resolver availableDeliveries
-- delivery-service/src/services/delivery.service.ts → método getAvailableDeliveriesForDriver
-- delivery-service/src/repositories/delivery.repository.ts → findAvailableDeliveries
+- order-service/src/events/kafka.producer.ts → publishOrderReady() ✓
+- order-service/src/services/order.service.ts → publishOrderReady en status=READY ✓
+- delivery-service/src/events/kafka.consumer.ts → handleOrderReady(), ORDER_READY_TOPIC ✓
+- delivery-service/src/events/kafka.consumer.ts → ORDER_READY_DLQ ✓
+- delivery-service/schema.graphql → query availableDeliveries, subscription newAvailableDelivery ✓
+- delivery-service/src/resolvers/delivery.resolver.ts → getAvailableDeliveries, subscribeToNewAvailableDeliveries ✓
+- delivery-service/src/services/delivery.service.ts → createPendingDelivery(), getAvailableDeliveries() ✓
+- delivery-service/src/services/delivery.service.ts → acceptDelivery() con atomic claimDelivery() ✓
+- delivery-service/src/repositories/delivery.repository.ts → findAvailableDeliveries() ✓
+- delivery-service/src/repositories/delivery.repository.ts → claimDelivery() (atomic UPDATE) ✓
+- delivery-service/src/repositories/delivery.repository.ts → createPendingDelivery() con ON CONFLICT DO NOTHING ✓
+- delivery-service/src/pubsub/redis.pubsub.ts → newAvailableDeliveryChannel() broadcast ✓
+- scripts/kafka-init-topics.sh → order.ready, order.ready.dlq ✓
 
 Frontend:
-- frontend/src/pages/DeliveryDashboard.tsx → mostrar sección "Pedidos Disponibles"
-- Agregar sección de pedidos pendientes de aceptar
-- Mutation acceptDelivery en frontend
+- frontend/src/pages/DeliveryDashboard.tsx → Sección "Pedidos Disponibles" ✓
+- NEW_AVAILABLE_DELIVERY subscription (broadcast a todos los drivers) ✓
+- Optimistic UI con handling de race conditions ✓
+- Botón "Tomar este pedido" con estado "Tomando..." ✓
+- newDeliveryCount badge cuando llegan nuevos pedidos ✓
 
-TOPICS KAFKA NECESARIOS:
-- order.ready (nuevo topic)
+TOPICS KAFKA CREADOS:
+- order.ready ✓
+- order.ready.dlq ✓
 
 DATOS ACTUALES EN BD:
 - Pedidos READY sin delivery_person_id:

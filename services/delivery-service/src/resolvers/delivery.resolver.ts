@@ -1,5 +1,5 @@
 import { DeliveryService } from '../services/delivery.service';
-import { RedisPubSub, deliveryStatusChannel, driverAssignedChannel, myDeliveryUpdatesChannel } from '../pubsub/redis.pubsub';
+import { RedisPubSub, deliveryStatusChannel, driverAssignedChannel, myDeliveryUpdatesChannel, newAvailableDeliveryChannel } from '../pubsub/redis.pubsub';
 import { DeliveryStatus, DriverStatus, Location } from '../models/delivery.model';
 import { AuthContext } from '../middleware/auth';
 
@@ -9,7 +9,7 @@ interface ResolverContext {
 }
 
 export class DeliveryResolver {
-  constructor(private readonly deliveryService: DeliveryService) {}
+  constructor(private readonly deliveryService: DeliveryService) { }
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -38,6 +38,14 @@ export class DeliveryResolver {
     _ctx: ResolverContext,
   ) {
     return this.deliveryService.getAvailableDrivers();
+  }
+
+  async getAvailableDeliveries(
+    _parent: unknown,
+    _args: Record<string, never>,
+    _ctx: ResolverContext,
+  ) {
+    return this.deliveryService.getAvailableDeliveries();
   }
 
   async getDeliveryPerson(
@@ -122,5 +130,13 @@ export class DeliveryResolver {
     ctx: ResolverContext,
   ) {
     return ctx.pubSub.asyncIterator(myDeliveryUpdatesChannel(args.deliveryPersonId));
+  }
+
+  subscribeToNewAvailableDeliveries(
+    _parent: unknown,
+    _args: Record<string, never>,
+    ctx: ResolverContext,
+  ) {
+    return ctx.pubSub.asyncIterator(newAvailableDeliveryChannel());
   }
 }

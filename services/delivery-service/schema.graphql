@@ -5,6 +5,7 @@ type Query {
   delivery(id: ID!): Delivery
   deliveries(orderId: ID, status: DeliveryStatus): [Delivery!]!
   availableDrivers: [DeliveryPerson!]!
+  availableDeliveries: [Delivery!]!
   deliveryPerson(id: ID!): DeliveryPerson
   myDeliveries(deliveryPersonId: ID!): [Delivery!]!
   myDeliveryPerson(userId: ID!): DeliveryPerson
@@ -21,6 +22,7 @@ type Subscription {
   deliveryStatusChanged(deliveryId: ID!): Delivery!
   driverAssigned(orderId: ID!): Delivery!
   myDeliveryUpdates(deliveryPersonId: ID!): Delivery!
+  newAvailableDelivery: Delivery!
 }
 
 type DeliveryPerson @key(fields: "id") {

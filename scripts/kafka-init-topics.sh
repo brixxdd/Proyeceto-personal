@@ -44,6 +44,7 @@ create_topic "order.created"            3 1
 create_topic "order.assigned"           3 1
 create_topic "order.delivered"          1 1
 create_topic "order.cancelled"          3 1
+create_topic "order.ready"              3 1
 create_topic "delivery.assigned"        3 1
 create_topic "delivery.status_changed"  1 1
 create_topic "restaurant.created"       1 1
@@ -54,6 +55,7 @@ create_topic "notification.sms"         2 1
 # ── Dead Letter Queues ─────────────────────────────────────────────────────────
 create_topic "order.created.dlq"        1 1
 create_topic "order.cancelled.dlq"      1 1
+create_topic "order.ready.dlq"          1 1
 create_topic "delivery.assigned.dlq"    1 1
 
 echo "[kafka-init] All topics created successfully."

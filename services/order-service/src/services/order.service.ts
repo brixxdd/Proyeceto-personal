@@ -114,6 +114,14 @@ export class OrderService {
         deliveryPersonId,
         timestamp: new Date().toISOString(),
       });
+    } else if (status === OrderStatus.READY) {
+      await this.kafkaProducer.publishOrderReady({
+        orderId: order.id,
+        customerId: order.customerId,
+        restaurantId: order.restaurantId,
+        totalAmount: order.totalAmount,
+        timestamp: new Date().toISOString(),
+      });
     } else if (status === OrderStatus.DELIVERED) {
       await this.kafkaProducer.publishOrderDelivered({
         orderId: order.id,
