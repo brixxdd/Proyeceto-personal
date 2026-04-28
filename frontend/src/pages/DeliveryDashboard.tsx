@@ -8,8 +8,8 @@ import PageTransition from '../components/PageTransition'
 import { slideUp, staggerContainer } from '../lib/animations'
 
 const GET_MY_PROFILE = gql`
-  query GetMyDeliveryProfile {
-    myDeliveryPerson(userId: "") {
+  query GetMyDeliveryProfile($userId: ID!) {
+    myDeliveryPerson(userId: $userId) {
       id
       name
       status
@@ -85,6 +85,18 @@ const NEW_AVAILABLE_DELIVERY = gql`
   }
 `
 
+const CREATE_DELIVERY_PERSON = gql`
+  mutation CreateDeliveryPerson($userId: ID!, $name: String!, $vehicleType: VehicleType!) {
+    createDeliveryPerson(userId: $userId, name: $name, vehicleType: $vehicleType) {
+      id
+      name
+      status
+      vehicleType
+      rating
+    }
+  }
+`
+
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; next?: string[] }> = {
   PENDING: { label: 'Disponible', color: '#6B7280', bg: '#F3F4F6', next: ['ASSIGNED'] },
   ASSIGNED: { label: 'Asignado', color: '#007AFF', bg: '#DBEAFE', next: ['PICKED_UP'] },
@@ -143,6 +155,34 @@ export default function DeliveryDashboard() {
 
   const [updateStatus] = useMutation<any>(UPDATE_DELIVERY_STATUS)
   const [acceptDeliveryMutation] = useMutation<any>(ACCEPT_DELIVERY)
+  const [createDeliveryPerson, { loading: creatingProfile }] = useMutation<any>(CREATE_DELIVERY_PERSON, {
+    update(cache, { data: { createDeliveryPerson } }) {
+      cache.writeQuery({
+        query: GET_MY_PROFILE,
+        variables: { userId: userId || '' },
+        data: { myDeliveryPerson: createDeliveryPerson }
+      })
+    }
+  })
+
+  const [profileForm, setProfileForm] = useState({ name: '', vehicleType: 'BICYCLE' })
+
+  async function handleCreateProfile(e: React.FormEvent) {
+    e.preventDefault()
+    if (!userId || !profileForm.name) return
+    try {
+      await createDeliveryPerson({
+        variables: {
+          userId,
+          name: profileForm.name,
+          vehicleType: profileForm.vehicleType
+        }
+      })
+    } catch (err) {
+      console.error(err)
+      alert('Error al crear perfil')
+    }
+  }
 
   // Sync my assigned deliveries
   useEffect(() => {
@@ -266,9 +306,62 @@ export default function DeliveryDashboard() {
   if (!profileData?.myDeliveryPerson) {
     return (
       <PageTransition>
-        <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-          <p className="text-[var(--color-muted-foreground)] mb-4">No tienes un perfil de repartidor registrado</p>
-          <p className="text-sm text-[var(--color-muted-foreground)]">Contacta a soporte para registrarte como repartidor</p>
+        <div className="max-w-xl mx-auto px-4 py-12">
+          <motion.div variants={staggerContainer} initial="initial" animate="animate" className="bg-[var(--color-card)] p-6 md:p-8 rounded-[24px] border border-[var(--color-border)] text-center ios-shadow-sm">
+            <div className="w-16 h-16 rounded-[20px] bg-[var(--color-primary)]/10 flex items-center justify-center mx-auto mb-5">
+              <Bike size={32} className="text-[var(--color-primary)]" />
+            </div>
+            <h2 className="text-xl md:text-2xl font-bold mb-2">Completar perfil de repartidor</h2>
+            <p className="text-[14px] text-[var(--color-muted-foreground)] mb-6">
+              Para comenzar a recibir pedidos, necesitamos algunos datos adicionales.
+            </p>
+            <form onSubmit={handleCreateProfile} className="flex flex-col gap-5 text-left">
+              <div>
+                <label className="text-[13px] font-semibold px-1">Nombre completo</label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.name}
+                  onChange={e => setProfileForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full mt-1.5 px-4 py-3.5 rounded-[16px] bg-[var(--color-muted)] border border-[var(--color-border)] focus:bg-[var(--color-card)] transition-colors text-[15px]"
+                  placeholder="Ej. Juan Pérez"
+                />
+              </div>
+              <div>
+                <label className="text-[13px] font-semibold px-1">Tipo de vehículo</label>
+                <div className="grid grid-cols-3 gap-2 mt-1.5">
+                  {[
+                    { value: 'BICYCLE', label: 'Bicicleta', icon: '🚲' },
+                    { value: 'MOTORCYCLE', label: 'Motocicleta', icon: '🏍️' },
+                    { value: 'CAR', label: 'Auto', icon: '🚗' },
+                  ].map(v => (
+                    <button
+                      key={v.value}
+                      type="button"
+                      onClick={() => setProfileForm(f => ({ ...f, vehicleType: v.value }))}
+                      className={`p-3 rounded-[16px] border text-center transition-all ${
+                        profileForm.vehicleType === v.value
+                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
+                          : 'border-[var(--color-border)] bg-[var(--color-muted)] hover:bg-[var(--color-card)]'
+                      }`}
+                    >
+                      <span className="text-2xl block mb-1">{v.icon}</span>
+                      <span className={`text-[12px] font-bold ${
+                        profileForm.vehicleType === v.value ? 'text-[var(--color-primary)]' : 'text-[var(--color-foreground)]'
+                      }`}>{v.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={creatingProfile || !profileForm.name}
+                className="w-full mt-2 py-4 rounded-[16px] bg-[var(--color-primary)] text-white font-bold text-[15px] hover:opacity-90 transition-opacity disabled:opacity-50 ios-shadow"
+              >
+                {creatingProfile ? 'Guardando...' : 'Comenzar a repartir'}
+              </button>
+            </form>
+          </motion.div>
         </div>
       </PageTransition>
     )
