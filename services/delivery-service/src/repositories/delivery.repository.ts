@@ -242,3 +242,4 @@ export class DeliveryRepository {
     return mapDelivery(result.rows[0]);
   }
 }
+

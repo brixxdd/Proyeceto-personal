@@ -445,35 +445,39 @@ export default function DeliveryDashboard() {
                 <p className="text-xs text-[var(--color-muted-foreground)] mt-1">Te notificaremos cuando llegue uno nuevo</p>
               </motion.div>
             ) : (
-              <motion.div key="list" variants={{ show: { transition: { staggerChildren: 0.06 } } }} initial="hidden" animate="show" className="space-y-3">
+              <motion.div key="list" className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide"
+                variants={{ show: { transition: { staggerChildren: 0.06 } } }} initial="hidden" animate="show">
                 {localAvailable.map((delivery: any) => (
-                  <motion.div key={delivery.id} variants={item} whileTap={tap}
-                    className="bg-[var(--color-muted)] rounded-2xl border border-[#22C55E]/20 p-5 relative overflow-hidden">
-                    {/* Left accent */}
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#22C55E]" />
-                    <div className="pl-3">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[13px] font-mono font-semibold text-[var(--color-foreground)]">#{delivery.orderId?.slice(0, 8)}</span>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20">
-                              <span className="w-1 h-1 rounded-full bg-[#22C55E]" />NUEVO
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 text-[12px] text-[var(--color-muted-foreground)]">
-                            <Clock className="w-3 h-3" />
-                            {new Date(delivery.createdAt).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-[var(--color-muted-foreground)]" />
+                  <motion.div key={delivery.id} variants={item}
+                    className="shrink-0 w-[260px] bg-[var(--color-muted)] rounded-2xl border border-[#22C55E]/20 p-4 flex flex-col gap-3">
+                    {/* Top row */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[12px] font-mono font-bold text-[var(--color-foreground)]">#{delivery.orderId?.slice(0, 8)}</span>
+                        {newDeliveryCount > 0 && (
+                          <span className="w-2 h-2 rounded-full bg-[#FF3B30] animate-pulse" />
+                        )}
                       </div>
-                      <motion.button whileTap={tap}
-                        onClick={() => handleAcceptDelivery(delivery.id, delivery.orderId)}
-                        disabled={claimingId === delivery.id}
-                        className="w-full mt-4 py-3.5 rounded-xl bg-[#22C55E] text-[#052E16] font-bold text-[14px] hover:bg-[#16A34A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer">
-                        {claimingId === delivery.id ? <><RefreshCw className="w-4 h-4 animate-spin" />Tomando...</> : <><CheckCircle className="w-4 h-4" />Tomar pedido</>}
-                      </motion.button>
+                      <span className="text-[10px] font-bold text-[#22C55E] bg-[#22C55E]/10 px-2 py-0.5 rounded-full">NUEVO</span>
                     </div>
+                    {/* Time */}
+                    <div className="flex items-center gap-1 text-[11px] text-[var(--color-muted-foreground)]">
+                      <Clock className="w-3 h-3" />
+                      {new Date(delivery.createdAt).toLocaleString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    {/* Spacer */}
+                    <div className="flex-1" />
+                    {/* Action */}
+                    <motion.button whileTap={tap}
+                      onClick={() => handleAcceptDelivery(delivery.id, delivery.orderId)}
+                      disabled={claimingId === delivery.id}
+                      className="w-full py-3 rounded-xl bg-[#22C55E] text-[#052E16] font-bold text-[13px] hover:bg-[#16A34A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer">
+                      {claimingId === delivery.id ? (
+                        <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Tomando...</>
+                      ) : (
+                        <><CheckCircle className="w-3.5 h-3.5" />Tomar</>
+                      )}
+                    </motion.button>
                   </motion.div>
                 ))}
               </motion.div>

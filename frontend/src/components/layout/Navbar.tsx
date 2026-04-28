@@ -124,7 +124,6 @@ export default function Navbar() {
 
           {/* Mobile right */}
           <div className="flex md:hidden items-center gap-2">
-            <ThemeToggle />
             <Link
               to="/restaurants"
               className="w-9 h-9 flex items-center justify-center rounded-xl"
@@ -168,23 +167,25 @@ export default function Navbar() {
           <span className="hidden sm:inline">FoodDash</span>
         </Link>
 
-        {/* Desktop main nav — role-aware */}
+        {/* Desktop main nav */}
         <div className="hidden md:flex items-center gap-1">
-          <NavLink to="/" icon={Home} label="Inicio" active={pathname === '/'} />
           {isDelivery ? (
-            <NavLink to="/delivery" icon={LayoutDashboard} label="Entregas" active={pathname.startsWith('/delivery')} />
+            <>
+              <NavLink to="/delivery" icon={LayoutDashboard} label="Entregas" active={pathname.startsWith('/delivery')} />
+              <NavLink to="/profile" icon={User} label="Perfil" active={pathname === '/profile'} />
+            </>
           ) : (
             <>
               <NavLink to="/restaurants" icon={UtensilsCrossed} label="Explorar" active={pathname.startsWith('/restaurants') || pathname.startsWith('/restaurant')} />
               <NavLink to={ordersLink} icon={isOwner ? LayoutDashboard : ShoppingBag} label={isOwner ? 'Dashboard' : 'Pedidos'} active={pathname === ordersLink || (isOwner && pathname.startsWith('/dashboard'))} />
               {!isOwner && <NavLink to="/cart" icon={ShoppingCart} label="Carrito" active={pathname === '/cart'} badge={itemCount > 0 ? itemCount : undefined} />}
+              <NavLink to="/profile" icon={User} label="Perfil" active={pathname === '/profile'} />
             </>
           )}
-          <NavLink to="/profile" icon={User} label="Perfil" active={pathname === '/profile'} />
         </div>
 
-        {/* Right actions */}
-        <div className="flex items-center gap-2">
+        {/* Right actions — desktop only */}
+        <div className="hidden md:flex items-center gap-2">
           <ThemeToggle />
           <motion.button
             onClick={handleLogout}
