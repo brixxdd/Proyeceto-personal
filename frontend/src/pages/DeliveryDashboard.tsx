@@ -1,26 +1,28 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useApolloClient } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bike,
-  Package,
-  MapPin,
-  Clock,
-  CheckCircle,
-  Navigation,
-  Bell,
-  RefreshCw,
+  Zap,
   Star,
+  MapPin,
+  Navigation,
+  Clock,
+  Package,
+  CheckCircle,
   ChevronRight,
   CircleDot,
-  Zap,
+  RefreshCw,
   AlertCircle,
+  ToggleLeft,
+  ToggleRight,
+  Camera,
 } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
 import { slideUp, staggerContainer } from '../lib/animations'
 
+// ─── GraphQL ────────────────────────────────────────────────────────────────────
 const GET_MY_PROFILE = gql`
   query GetMyDeliveryProfile($userId: ID!) {
     myDeliveryPerson(userId: $userId) {
@@ -111,85 +113,72 @@ const CREATE_DELIVERY_PERSON = gql`
   }
 `
 
-// ─── Status Config ─────────────────────────────────────────────────────────────
-type StatusKey = 'PENDING' | 'ASSIGNED' | 'PICKED_UP' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED'
-
-const STATUS_CONFIG: Record<StatusKey, { label: string; dot: string; bg: string; text: string; border: string; next?: StatusKey[] }> = {
-  PENDING:     { label: 'Disponible',  dot: '#22C55E', bg: '#052E16', text: '#22C55E', border: '#166534', next: ['ASSIGNED'] },
-  ASSIGNED:    { label: 'Asignado',    dot: '#3B82F6', bg: '#1E3A5F', text: '#60A5FA', border: '#1D4ED8', next: ['PICKED_UP'] },
-  PICKED_UP:   { label: 'Recogido',    dot: '#F59E0B', bg: '#451A03', text: '#FBBF24', border: '#D97706', next: ['IN_TRANSIT', 'DELIVERED'] },
-  IN_TRANSIT:  { label: 'En camino',   dot: '#8B5CF6', bg: '#2E1065', text: '#C4B5FD', border: '#7C3AED', next: ['DELIVERED'] },
-  DELIVERED:   { label: 'Entregado',   dot: '#10B981', bg: '#022C22', text: '#34D399', border: '#059669', next: [] },
-  CANCELLED:   { label: 'Cancelado',   dot: '#EF4444', bg: '#450A0A', text: '#FCA5A5', border: '#DC2626', next: [] },
+// ─── Configs ────────────────────────────────────────────────────────────────────
+const DELIVERY_STATUS: Record<string, { label: string; dot: string; color: string; bg: string; next?: string[] }> = {
+  PENDING:    { label: 'Pendiente',   dot: '#6B7280', color: '#6B7280', bg: '#1F2937', next: ['ASSIGNED'] },
+  ASSIGNED:   { label: 'Asignado',     dot: '#3B82F6', color: '#3B82F6', bg: '#1E3A5F', next: ['PICKED_UP'] },
+  PICKED_UP:  { label: 'Recogido',     dot: '#F59E0B', color: '#F59E0B', bg: '#451A03', next: ['IN_TRANSIT', 'DELIVERED'] },
+  IN_TRANSIT: { label: 'En camino',    dot: '#8B5CF6', color: '#8B5CF6', bg: '#2E1065', next: ['DELIVERED'] },
+  DELIVERED:  { label: 'Entregado',    dot: '#10B981', color: '#10B981', bg: '#022C22', next: [] },
+  CANCELLED:  { label: 'Cancelado',    dot: '#EF4444', color: '#EF4444', bg: '#450A0A', next: [] },
 }
 
-const NEXT_ACTION_LABELS: Record<string, string> = {
+const DRIVER_STATUS_CONFIG = {
+  AVAILABLE: { label: 'En línea',   color: '#22C55E', bg: '#052E16' },
+  BUSY:      { label: 'En entrega',  color: '#F59E0B', bg: '#451A03' },
+  OFFLINE:   { label: 'Desconectado', color: '#6B7280', bg: '#1F2937' },
+}
+
+const VEHICLE_CONFIG = {
+  BICYCLE:    { label: 'Bicicleta',     icon: Bike },
+  MOTORCYCLE: { label: 'Motocicleta',   icon: Zap },
+  CAR:        { label: 'Automóvil',     icon: Package },
+} as const
+
+const NEXT_ACTION: Record<string, string> = {
   PICKED_UP:  'Recoger pedido',
   IN_TRANSIT: 'Ir al cliente',
   DELIVERED:  'Marcar entregado',
 }
 
-// ─── Vehicle Config ────────────────────────────────────────────────────────────
-const VEHICLE_CONFIG = {
-  BICYCLE:    { label: 'Bicicleta',    icon: Bike },
-  MOTORCYCLE: { label: 'Motocicleta',  icon: Zap },
-  CAR:        { label: 'Automóvil',   icon: Package },
-} as const
-
-// ─── Animation variants ───────────────────────────────────────────────────────
+// ─── Animation ────────────────────────────────────────────────────────────────
 const container = {
   hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.08, delayChildren: 0.1 },
-  },
+  show: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
 }
-
-const itemSlide = {
-  hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] } },
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] } },
 }
+const tap = { rest: { scale: 1 }, pressed: { scale: 0.96 } }
 
-const cardTap = {
-  rest: { scale: 1 },
-  pressed: { scale: 0.97 },
-}
-
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
-function SkeletonCard({ lines = 2 }: { lines?: number }) {
+// ─── Sub-components ──────────────────────────────────────────────────────────
+function SkeletonCard() {
   return (
-    <div className="rounded-2xl bg-[var(--color-muted)] p-5 border border-[var(--color-border)] animate-pulse">
-      <div className="flex items-start justify-between mb-4">
+    <div className="rounded-2xl bg-[var(--color-muted)] border border-[var(--color-border)] p-5 animate-pulse">
+      <div className="flex justify-between mb-4">
         <div className="space-y-2">
           <div className="h-3 w-20 rounded bg-[var(--color-border)]" />
-          <div className="h-6 w-24 rounded bg-[var(--color-border)]" />
+          <div className="h-5 w-28 rounded bg-[var(--color-border)]" />
         </div>
         <div className="h-3 w-16 rounded bg-[var(--color-border)]" />
       </div>
-      {Array.from({ length: lines }).map((_, i) => (
-        <div key={i} className="h-3 w-full rounded bg-[var(--color-border)] mb-2 last:mb-0" />
-      ))}
+      <div className="h-10 w-full rounded-xl bg-[var(--color-border)]" />
     </div>
   )
 }
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status as StatusKey] || STATUS_CONFIG.PENDING
+function DriverAvatar({ vehicleType }: { vehicleType: string }) {
+  const Icon = VEHICLE_CONFIG[vehicleType as keyof typeof VEHICLE_CONFIG]?.icon || Bike
   return (
-    <span
-      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
-      style={{ backgroundColor: cfg.bg, color: cfg.text, borderColor: cfg.border }}
-    >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cfg.dot }} />
-      {cfg.label}
-    </span>
+    <div className="w-12 h-12 rounded-2xl bg-[#22C55E]/10 border border-[#22C55E]/20 flex items-center justify-center">
+      <Icon className="w-6 h-6 text-[#22C55E]" />
+    </div>
   )
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function DeliveryDashboard() {
-  const navigate = useNavigate()
   const client = useApolloClient()
 
   const [localDeliveries, setLocalDeliveries] = useState<any[]>([])
@@ -204,9 +193,7 @@ export default function DeliveryDashboard() {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]))
       return payload.userId || payload.sub
-    } catch {
-      return null
-    }
+    } catch { return null }
   }, [])
 
   const { data: profileData, loading: profileLoading } = useQuery<any>(GET_MY_PROFILE, {
@@ -215,9 +202,7 @@ export default function DeliveryDashboard() {
   })
 
   useEffect(() => {
-    if (profileData?.myDeliveryPerson) {
-      setMyDeliveryPersonId(profileData.myDeliveryPerson.id)
-    }
+    if (profileData?.myDeliveryPerson) setMyDeliveryPersonId(profileData.myDeliveryPerson.id)
   }, [profileData])
 
   const { data: deliveriesData, loading: deliveriesLoading, refetch: refetchMyDeliveries } = useQuery<any>(GET_MY_DELIVERIES, {
@@ -234,505 +219,404 @@ export default function DeliveryDashboard() {
   const [acceptDeliveryMutation] = useMutation<any>(ACCEPT_DELIVERY)
   const [createDeliveryPerson, { loading: creatingProfile }] = useMutation<any>(CREATE_DELIVERY_PERSON, {
     update(cache, { data: { createDeliveryPerson } }) {
-      cache.writeQuery({
-        query: GET_MY_PROFILE,
-        variables: { userId: userId || '' },
-        data: { myDeliveryPerson: createDeliveryPerson },
-      })
+      cache.writeQuery({ query: GET_MY_PROFILE, variables: { userId: userId || '' }, data: { myDeliveryPerson: createDeliveryPerson } })
     },
   })
 
-  const [profileForm, setProfileForm] = useState({ name: '', vehicleType: 'BICYCLE' as string })
+  const [profileForm, setProfileForm] = useState({ name: '', vehicleType: 'BICYCLE' })
 
   async function handleCreateProfile(e: React.FormEvent) {
     e.preventDefault()
     if (!userId || !profileForm.name) return
     try {
-      await createDeliveryPerson({
-        variables: {
-          userId,
-          name: profileForm.name,
-          vehicleType: profileForm.vehicleType,
-        },
-      })
+      await createDeliveryPerson({ variables: { userId, name: profileForm.name, vehicleType: profileForm.vehicleType } })
     } catch (err) {
       console.error(err)
       alert('Error al crear perfil')
     }
   }
 
-  // Sync my deliveries
-  useEffect(() => {
-    if (deliveriesData?.myDeliveries) {
-      setLocalDeliveries(deliveriesData.myDeliveries)
-    }
-  }, [deliveriesData])
+  useEffect(() => { if (deliveriesData?.myDeliveries) setLocalDeliveries(deliveriesData.myDeliveries) }, [deliveriesData])
+  useEffect(() => { if (availableData?.availableDeliveries) setLocalAvailable(availableData.availableDeliveries) }, [availableData])
 
-  // Sync available
-  useEffect(() => {
-    if (availableData?.availableDeliveries) {
-      setLocalAvailable(availableData.availableDeliveries)
-    }
-  }, [availableData])
-
-  // My deliveries subscription
+  // Subscriptions
   useEffect(() => {
     if (!myDeliveryPersonId) return
-    const observable = client.subscribe<any>({
-      query: MY_DELIVERY_UPDATES,
-      variables: { deliveryPersonId: myDeliveryPersonId },
-    })
-    const subscription = observable.subscribe({
+    const sub = client.subscribe<any>({ query: MY_DELIVERY_UPDATES, variables: { deliveryPersonId: myDeliveryPersonId } }).subscribe({
       next: ({ data }: any) => {
         if (data?.myDeliveryUpdates) {
-          const updated = data.myDeliveryUpdates
-          console.log('[DD] WS myDeliveryUpdates:', updated.status)
-          setLocalDeliveries((prev) =>
-            prev.map((d) => (d.id === updated.id ? { ...d, ...updated } : d))
-          )
+          setLocalDeliveries(prev => prev.map(d => d.id === data.myDeliveryUpdates.id ? { ...d, ...data.myDeliveryUpdates } : d))
         }
       },
-      error: (err: any) => console.error('[DD] Subscription error:', err),
+      error: (err: any) => console.error('[DD] Sub error:', err),
     })
-    return () => subscription.unsubscribe()
+    return () => sub.unsubscribe()
   }, [myDeliveryPersonId, client])
 
-  // New available subscription
   useEffect(() => {
-    const observable = client.subscribe<any>({ query: NEW_AVAILABLE_DELIVERY })
-    const subscription = observable.subscribe({
+    const sub = client.subscribe<any>({ query: NEW_AVAILABLE_DELIVERY }).subscribe({
       next: ({ data }: any) => {
         if (data?.newAvailableDelivery) {
-          const newD = data.newAvailableDelivery
-          console.log('[DD] WS newAvailableDelivery:', newD.orderId)
-          setLocalAvailable((prev) => {
-            if (prev.some((d) => d.id === newD.id)) return prev
-            setNewDeliveryCount((c) => c + 1)
-            return [newD, ...prev]
+          const nd = data.newAvailableDelivery
+          setLocalAvailable(prev => {
+            if (prev.some(d => d.id === nd.id)) return prev
+            setNewDeliveryCount(c => c + 1)
+            return [nd, ...prev]
           })
         }
       },
-      error: (err: any) => console.error('[DD] Available sub error:', err),
+      error: (err: any) => console.error('[DD] Avail sub error:', err),
     })
-    return () => subscription.unsubscribe()
+    return () => sub.unsubscribe()
   }, [client])
 
   async function handleAcceptDelivery(deliveryId: string, orderId: string) {
     if (!myDeliveryPersonId) return
     setClaimingId(deliveryId)
     try {
-      const { data } = await acceptDeliveryMutation({
-        variables: { orderId, deliveryPersonId: myDeliveryPersonId },
-      })
-      const accepted = data?.acceptDelivery
-      if (accepted) {
-        console.log('[DD] Claimed:', deliveryId)
-        setLocalAvailable((prev) => prev.filter((d) => d.id !== deliveryId))
+      const { data } = await acceptDeliveryMutation({ variables: { orderId, deliveryPersonId: myDeliveryPersonId } })
+      if (data?.acceptDelivery) {
+        setLocalAvailable(prev => prev.filter(d => d.id !== deliveryId))
         setNewDeliveryCount(0)
-        setLocalDeliveries((prev) => [...prev, { ...accepted }])
+        setLocalDeliveries(prev => [...prev, { ...data.acceptDelivery }])
         await refetchAvailable()
         await refetchMyDeliveries()
       }
     } catch (err: any) {
-      console.error('[DD] Claim failed:', err.message)
       alert('Este pedido ya fue tomado por otro repartidor.')
-      setLocalAvailable((prev) => prev.filter((d) => d.id !== deliveryId))
+      setLocalAvailable(prev => prev.filter(d => d.id !== deliveryId))
     } finally {
       setClaimingId(null)
     }
   }
 
   async function handleStatusUpdate(deliveryId: string, newStatus: string) {
-    setLocalDeliveries((prev) =>
-      prev.map((d) => (d.id === deliveryId ? { ...d, status: newStatus } : d))
-    )
+    setLocalDeliveries(prev => prev.map(d => d.id === deliveryId ? { ...d, status: newStatus } : d))
     await updateStatus({ variables: { id: deliveryId, status: newStatus } })
   }
 
-  // ─── Auth guard ──────────────────────────────────────────────────────────────
-  if (!userId) {
-    return (
-      <PageTransition>
-        <div className="max-w-2xl mx-auto px-4 py-24 text-center">
-          <AlertCircle className="w-12 h-12 text-[var(--color-muted-foreground)] mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-[var(--color-foreground)] mb-2">Sesión requerida</h2>
-          <p className="text-[var(--color-muted-foreground)]">Inicia sesión para acceder al panel.</p>
-        </div>
-      </PageTransition>
-    )
-  }
+  // ─── Auth ───────────────────────────────────────────────────────────────────────
+  if (!userId) return (
+    <PageTransition>
+      <div className="max-w-2xl mx-auto px-4 py-24 text-center">
+        <AlertCircle className="w-12 h-12 text-[var(--color-muted-foreground)] mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-[var(--color-foreground)] mb-2">Sesión requerida</h2>
+        <p className="text-[var(--color-muted-foreground)]">Inicia sesión para acceder al panel.</p>
+      </div>
+    </PageTransition>
+  )
 
-  // ─── Loading skeleton ────────────────────────────────────────────────────────
-  if (profileLoading) {
-    return (
-      <PageTransition>
-        <div className="max-w-2xl mx-auto px-4 py-8">
-          <div className="h-32 rounded-2xl animate-pulse bg-[var(--color-muted)] mb-6" />
-          <div className="space-y-4">
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
-        </div>
-      </PageTransition>
-    )
-  }
+  // ─── Profile loading ──────────────────────────────────────────────────────────
+  if (profileLoading) return (
+    <PageTransition>
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <div className="h-28 rounded-2xl animate-pulse bg-[var(--color-muted)]" />
+        <div className="h-40 rounded-2xl animate-pulse bg-[var(--color-muted)]" />
+        <SkeletonCard />
+      </div>
+    </PageTransition>
+  )
 
   // ─── Onboarding ──────────────────────────────────────────────────────────────
-  if (!profileData?.myDeliveryPerson) {
-    return (
-      <PageTransition>
-        <div className="max-w-xl mx-auto px-4 py-12">
-          <motion.div
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="bg-[var(--color-muted)] p-8 md:p-10 rounded-3xl border border-[var(--color-border)]"
-          >
-            <motion.div variants={itemSlide} className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-[#22C55E]/10 border border-[#22C55E]/20 flex items-center justify-center">
-                  <Bike className="w-6 h-6 text-[#22C55E]" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-[var(--color-foreground)]">Registro de Repartidor</h1>
-                  <p className="text-sm text-[var(--color-muted-foreground)]">Completa tu perfil para empezar</p>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.form variants={itemSlide} onSubmit={handleCreateProfile} className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-[var(--color-foreground)] mb-2">
-                  Nombre completo
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={profileForm.name}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full px-4 py-4 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-foreground)] placeholder-[var(--color-muted-foreground)] focus:outline-none focus:border-[#22C55E] focus:ring-1 focus:ring-[#22C55E] transition-all text-[15px]"
-                  placeholder="Ej. Juan Pérez"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-[var(--color-foreground)] mb-3">
-                  Tipo de vehículo
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {Object.entries(VEHICLE_CONFIG).map(([key, { label, icon: Icon }]) => (
-                    <motion.button
-                      key={key}
-                      type="button"
-                      whileTap={cardTap}
-                      onClick={() => setProfileForm((f) => ({ ...f, vehicleType: key }))}
-                      className={`p-4 rounded-xl border text-center transition-all cursor-pointer ${
-                        profileForm.vehicleType === key
-                          ? 'border-[#22C55E] bg-[#22C55E]/10'
-                          : 'border-[var(--color-border)] hover:border-[var(--color-muted-foreground)]'
-                      }`}
-                    >
-                      <Icon className={`w-8 h-8 mx-auto mb-2 ${profileForm.vehicleType === key ? 'text-[#22C55E]' : 'text-[var(--color-muted-foreground)]'}`} />
-                      <span className={`text-[12px] font-semibold ${profileForm.vehicleType === key ? 'text-[#22C55E]' : 'text-[var(--color-foreground)]'}`}>
-                        {label}
-                      </span>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
-              <motion.button
-                type="submit"
-                disabled={creatingProfile || !profileForm.name}
-                whileTap={cardTap}
-                className="w-full py-4 rounded-xl bg-[#22C55E] text-[#052E16] font-bold text-[15px] hover:bg-[#16A34A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {creatingProfile ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    Comenzar a repartir
-                  </>
-                )}
-              </motion.button>
-            </motion.form>
+  if (!profileData?.myDeliveryPerson) return (
+    <PageTransition>
+      <div className="max-w-xl mx-auto px-4 py-12">
+        <motion.div variants={container} initial="hidden" animate="show" className="bg-[var(--color-muted)] p-8 md:p-10 rounded-3xl border border-[var(--color-border)]">
+          <motion.div variants={item} className="flex items-center gap-4 mb-8">
+            <DriverAvatar vehicleType="BICYCLE" />
+            <div>
+              <h1 className="text-xl font-bold text-[var(--color-foreground)]">Registro de Repartidor</h1>
+              <p className="text-sm text-[var(--color-muted-foreground)]">Completa tu perfil para empezar</p>
+            </div>
           </motion.div>
-        </div>
-      </PageTransition>
-    )
-  }
+
+          <motion.form variants={item} onSubmit={handleCreateProfile} className="space-y-6">
+            <div>
+              <label className="block text-sm font-semibold text-[var(--color-foreground)] mb-2">Nombre completo</label>
+              <input type="text" required value={profileForm.name} onChange={e => setProfileForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full px-4 py-4 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-[var(--color-foreground)] placeholder-[var(--color-muted-foreground)] focus:outline-none focus:border-[#22C55E] focus:ring-1 focus:ring-[#22C55E] transition-all text-[15px]"
+                placeholder="Ej. Juan Pérez" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[var(--color-foreground)] mb-3">Tipo de vehículo</label>
+              <div className="grid grid-cols-3 gap-3">
+                {Object.entries(VEHICLE_CONFIG).map(([key, { label, icon: Icon }]) => (
+                  <motion.button key={key} type="button" whileTap={tap}
+                    onClick={() => setProfileForm(f => ({ ...f, vehicleType: key }))}
+                    className={`p-4 rounded-xl border text-center transition-all cursor-pointer ${profileForm.vehicleType === key ? 'border-[#22C55E] bg-[#22C55E]/10' : 'border-[var(--color-border)] hover:border-[var(--color-muted-foreground)]'}`}>
+                    <Icon className={`w-7 h-7 mx-auto mb-2 ${profileForm.vehicleType === key ? 'text-[#22C55E]' : 'text-[var(--color-muted-foreground)]'}`} />
+                    <span className={`text-[12px] font-semibold ${profileForm.vehicleType === key ? 'text-[#22C55E]' : 'text-[var(--color-foreground)]'}`}>{label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+
+            <motion.button type="submit" disabled={creatingProfile || !profileForm.name} whileTap={tap}
+              className="w-full py-4 rounded-xl bg-[#22C55E] text-[#052E16] font-bold text-[15px] hover:bg-[#16A34A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              {creatingProfile ? <><RefreshCw className="w-4 h-4 animate-spin" />Guardando...</> : <><CheckCircle className="w-4 h-4" />Comenzar a repartir</>}
+            </motion.button>
+          </motion.form>
+        </motion.div>
+      </div>
+    </PageTransition>
+  )
 
   const profile = profileData.myDeliveryPerson
-  const deliveries = localDeliveries
+  const driverStatusCfg = DRIVER_STATUS_CONFIG[profile.status as keyof typeof DRIVER_STATUS_CONFIG] || DRIVER_STATUS_CONFIG.OFFLINE
+  const activeDeliveries = localDeliveries.filter(d => !['DELIVERED', 'CANCELLED'].includes(d.status))
+  const completedDeliveries = localDeliveries.filter(d => ['DELIVERED', 'CANCELLED'].includes(d.status))
 
   return (
     <PageTransition>
       <main className="max-w-2xl mx-auto px-4 py-6 pb-36 md:pb-10">
 
-        {/* ─── Header Card ───────────────────────────────────────────────────── */}
+        {/* ════════════════════════════════════════════════════════════
+            DRIVER HEADER CARD
+        ════════════════════════════════════════════════════════════ */}
         <motion.div variants={container} initial="hidden" animate="show" className="mb-6">
-          <motion.div
-            variants={itemSlide}
-            className="bg-[var(--color-muted)] rounded-2xl p-6 border border-[var(--color-border)]"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4">
-                {/* Avatar */}
-                <div className="relative">
-                  <div className="w-14 h-14 rounded-2xl bg-[#22C55E]/10 border border-[#22C55E]/20 flex items-center justify-center">
-                    <Bike className="w-7 h-7 text-[#22C55E]" />
-                  </div>
-                  {/* Online dot */}
+          <motion.div variants={item} className="bg-[var(--color-muted)] rounded-2xl p-5 border border-[var(--color-border)]">
+            <div className="flex items-center gap-4">
+              {/* Avatar + status dot */}
+              <div className="relative shrink-0">
+                <DriverAvatar vehicleType={profile.vehicleType} />
+                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[var(--color-muted)]"
+                  style={{ backgroundColor: driverStatusCfg.color }} />
+              </div>
+
+              {/* Name + vehicle + status */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg font-bold text-[var(--color-foreground)] truncate">{profile.name}</h1>
+                <div className="flex items-center gap-2 mt-0.5">
                   <span
-                    className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[var(--color-muted)]"
-                    style={{ backgroundColor: profile.status === 'AVAILABLE' ? '#22C55E' : profile.status === 'BUSY' ? '#EF4444' : '#6B7280' }}
-                  />
-                </div>
-
-                <div>
-                  <h1 className="text-2xl font-bold text-[var(--color-foreground)]">{profile.name}</h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <StatusBadge status={profile.status as StatusKey} />
-                    <span className="text-xs text-[var(--color-muted-foreground)]">
-                      {VEHICLE_CONFIG[profile.vehicleType as keyof typeof VEHICLE_CONFIG]?.label || profile.vehicleType}
-                    </span>
-                  </div>
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+                    style={{ backgroundColor: driverStatusCfg.bg, color: driverStatusCfg.color }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: driverStatusCfg.color }} />
+                    {driverStatusCfg.label}
+                  </span>
+                  <span className="text-[12px] text-[var(--color-muted-foreground)]">
+                    {VEHICLE_CONFIG[profile.vehicleType as keyof typeof VEHICLE_CONFIG]?.label}
+                  </span>
                 </div>
               </div>
 
-              {/* Rating */}
-              <div className="flex items-center gap-1.5 bg-[var(--color-background)] px-3 py-2 rounded-xl border border-[var(--color-border)]">
+              {/* Rating badge */}
+              <div className="flex items-center gap-1.5 bg-[var(--color-background)] px-3 py-2 rounded-xl border border-[var(--color-border)] shrink-0">
                 <Star className="w-4 h-4 text-[#F59E0B] fill-[#F59E0B]" />
-                <span className="text-sm font-bold text-[var(--color-foreground)]">
-                  {profile.rating?.toFixed(1) || '5.0'}
+                <span className="text-sm font-bold text-[var(--color-foreground)]">{profile.rating?.toFixed(1) || '5.0'}</span>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+
+        {/* ════════════════════════════════════════════════════════════
+            PEDIDOS DISPONIBLES
+        ════════════════════════════════════════════════════════════ */}
+        <motion.section variants={container} initial="hidden" animate="show" className="mb-6">
+          <motion.div variants={item} className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <CircleDot className="w-5 h-5 text-[#22C55E]" />
+              <h2 className="text-[15px] font-bold text-[var(--color-foreground)]">Pedidos Disponibles</h2>
+              {localAvailable.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-[#22C55E]/10 text-[11px] font-bold text-[#22C55E] border border-[#22C55E]/20">
+                  {localAvailable.length}
                 </span>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-
-        {/* ─── Available Orders Banner ──────────────────────────────────────── */}
-        <motion.div variants={container} initial="hidden" animate="show" className="mb-6">
-          <motion.div variants={itemSlide}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-[#F59E0B]" />
-                <h2 className="text-[15px] font-bold text-[var(--color-foreground)]">Pedidos Disponibles</h2>
-                {newDeliveryCount > 0 && (
-                  <motion.span
-                    key={newDeliveryCount}
-                    initial={{ scale: 0.5, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="flex items-center justify-center w-6 h-6 rounded-full bg-[#F59E0B] text-[#020617] text-[11px] font-bold"
-                  >
-                    +{newDeliveryCount}
-                  </motion.span>
-                )}
-              </div>
-              {availableLoading && <RefreshCw className="w-4 h-4 animate-spin text-[var(--color-muted-foreground)]" />}
-            </div>
-
-            <AnimatePresence mode="wait">
-              {availableLoading ? (
-                <motion.div key="avail-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-                  <SkeletonCard lines={1} />
-                  <SkeletonCard lines={1} />
-                </motion.div>
-              ) : localAvailable.length === 0 ? (
-                <motion.div
-                  key="avail-empty"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-[var(--color-muted)] rounded-2xl border border-[var(--color-border)] p-8 text-center"
-                >
-                  <CircleDot className="w-8 h-8 text-[var(--color-muted-foreground)] mx-auto mb-3" />
-                  <p className="text-sm font-semibold text-[var(--color-foreground)]">Sin pedidos disponibles</p>
-                  <p className="text-xs text-[var(--color-muted-foreground)] mt-1">Te notificaremos cuando llegue uno nuevo</p>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="avail-list"
-                  variants={{ show: { transition: { staggerChildren: 0.06 } } }}
-                  initial="hidden"
-                  animate="show"
-                  className="space-y-3"
-                >
-                  {localAvailable.map((delivery: any) => (
-                    <motion.div
-                      key={delivery.id}
-                      variants={itemSlide}
-                      whileTap={cardTap}
-                      className="bg-[var(--color-muted)] rounded-2xl border border-[#22C55E]/30 p-5 relative overflow-hidden"
-                    >
-                      {/* Left accent bar */}
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#22C55E]" />
-
-                      <div className="flex items-start justify-between pl-3">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[12px] font-mono text-[var(--color-muted-foreground)]">
-                              #{delivery.orderId?.slice(0, 8)}
-                            </span>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
-                              NUEVO
-                            </span>
-                          </div>
-                          <p className="text-[12px] text-[var(--color-muted-foreground)]">
-                            {new Date(delivery.createdAt).toLocaleString('es-MX', {
-                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                            })}
-                          </p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-[var(--color-muted-foreground)] mt-1" />
-                      </div>
-
-                      <motion.button
-                        onClick={() => handleAcceptDelivery(delivery.id, delivery.orderId)}
-                        disabled={claimingId === delivery.id}
-                        whileTap={cardTap}
-                        className="w-full mt-4 py-3.5 rounded-xl bg-[#22C55E] text-[#052E16] font-bold text-[14px] hover:bg-[#16A34A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        {claimingId === delivery.id ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            Tomando...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="w-4 h-4" />
-                            Tomar este pedido
-                          </>
-                        )}
-                      </motion.button>
-                    </motion.div>
-                  ))}
-                </motion.div>
               )}
-            </AnimatePresence>
-          </motion.div>
-        </motion.div>
-
-        {/* ─── My Deliveries ──────────────────────────────────────────────────── */}
-        <motion.div variants={container} initial="hidden" animate="show">
-          <motion.div variants={itemSlide} className="flex items-center gap-2 mb-3">
-            <Package className="w-5 h-5 text-[var(--color-primary)]" />
-            <h2 className="text-[15px] font-bold text-[var(--color-foreground)]">Mis Entregas</h2>
-            <span className="ml-auto px-2.5 py-0.5 rounded-full bg-[var(--color-muted)] text-[11px] font-bold text-[var(--color-muted-foreground)] border border-[var(--color-border)]">
-              {deliveries.length}
-            </span>
+              {newDeliveryCount > 0 && (
+                <motion.span key={newDeliveryCount} initial={{ scale: 0.5 }} animate={{ scale: 1 }}
+                  className="px-2 py-0.5 rounded-full bg-[#F59E0B]/10 text-[11px] font-bold text-[#F59E0B] border border-[#F59E0B]/20">
+                  +{newDeliveryCount} nuevo
+                </motion.span>
+              )}
+            </div>
+            {availableLoading && <RefreshCw className="w-4 h-4 animate-spin text-[var(--color-muted-foreground)]" />}
           </motion.div>
 
           <AnimatePresence mode="wait">
-            {deliveriesLoading ? (
+            {availableLoading ? (
               <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-                <SkeletonCard lines={2} />
-                <SkeletonCard lines={2} />
+                <SkeletonCard /><SkeletonCard />
               </motion.div>
-            ) : deliveries.length === 0 ? (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="bg-[var(--color-muted)] rounded-2xl border border-[var(--color-border)] p-10 text-center"
-              >
-                <div className="w-14 h-14 rounded-2xl bg-[var(--color-background)] border border-[var(--color-border)] flex items-center justify-center mx-auto mb-4">
-                  <Package className="w-7 h-7 text-[var(--color-muted-foreground)]" />
-                </div>
-                <p className="font-semibold text-[var(--color-foreground)]">Sin entregas activas</p>
-                <p className="text-sm text-[var(--color-muted-foreground)] mt-1">Toma un pedido disponible para comenzar</p>
+            ) : localAvailable.length === 0 ? (
+              <motion.div key="empty" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                className="bg-[var(--color-muted)] rounded-2xl border border-[var(--color-border)] p-8 text-center">
+                <CircleDot className="w-8 h-8 text-[var(--color-muted-foreground)] mx-auto mb-3" />
+                <p className="text-sm font-semibold text-[var(--color-foreground)]">Sin pedidos disponibles</p>
+                <p className="text-xs text-[var(--color-muted-foreground)] mt-1">Te notificaremos cuando llegue uno nuevo</p>
               </motion.div>
             ) : (
-              <motion.div
-                key="list"
-                variants={{ show: { transition: { staggerChildren: 0.07 } } }}
-                initial="hidden"
-                animate="show"
-                className="space-y-3"
-              >
-                {deliveries.map((delivery: any) => {
-                  const statusCfg = STATUS_CONFIG[delivery.status as StatusKey] || STATUS_CONFIG.PENDING
-                  const canAdvance = statusCfg.next && statusCfg.next.length > 0
-
-                  return (
-                    <motion.div
-                      key={delivery.id}
-                      variants={itemSlide}
-                      className="bg-[var(--color-muted)] rounded-2xl border border-[var(--color-border)] p-5"
-                    >
-                      <div className="flex items-start justify-between mb-4">
+              <motion.div key="list" variants={{ show: { transition: { staggerChildren: 0.06 } } }} initial="hidden" animate="show" className="space-y-3">
+                {localAvailable.map((delivery: any) => (
+                  <motion.div key={delivery.id} variants={item} whileTap={tap}
+                    className="bg-[var(--color-muted)] rounded-2xl border border-[#22C55E]/20 p-5 relative overflow-hidden">
+                    {/* Left accent */}
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#22C55E]" />
+                    <div className="pl-3">
+                      <div className="flex items-start justify-between">
                         <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[13px] font-mono font-semibold text-[var(--color-foreground)]">
-                              #{delivery.orderId?.slice(0, 8)}
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[13px] font-mono font-semibold text-[var(--color-foreground)]">#{delivery.orderId?.slice(0, 8)}</span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20">
+                              <span className="w-1 h-1 rounded-full bg-[#22C55E]" />NUEVO
                             </span>
-                            <StatusBadge status={delivery.status as StatusKey} />
                           </div>
-                          <p className="text-[12px] text-[var(--color-muted-foreground)]">
-                            {new Date(delivery.createdAt).toLocaleString('es-MX', {
-                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                            })}
-                          </p>
+                          <div className="flex items-center gap-1 text-[12px] text-[var(--color-muted-foreground)]">
+                            <Clock className="w-3 h-3" />
+                            {new Date(delivery.createdAt).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </div>
                         </div>
-
-                        {/* Status timeline dot */}
-                        <div className="flex flex-col items-center gap-1">
-                          <div
-                            className="w-3 h-3 rounded-full border-2 border-[var(--color-background)]"
-                            style={{ backgroundColor: statusCfg.dot }}
-                          />
-                        </div>
+                        <ChevronRight className="w-5 h-5 text-[var(--color-muted-foreground)]" />
                       </div>
-
-                      {/* Pickup hint */}
-                      {delivery.status === 'ASSIGNED' && (
-                        <div className="flex items-center gap-2 text-[13px] text-[var(--color-muted-foreground)] mb-4 p-3 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)]">
-                          <MapPin className="w-4 h-4 text-[#3B82F6]" />
-                          <span>Recoge en restaurante</span>
-                          <Navigation className="w-3.5 h-3.5 ml-auto text-[#3B82F6]" />
-                        </div>
-                      )}
-
-                      {delivery.status === 'IN_TRANSIT' && (
-                        <div className="flex items-center gap-2 text-[13px] text-[var(--color-muted-foreground)] mb-4 p-3 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)]">
-                          <Navigation className="w-4 h-4 text-[#8B5CF6]" />
-                          <span>En camino al cliente</span>
-                        </div>
-                      )}
-
-                      {/* Action buttons */}
-                      {canAdvance && (
-                        <div className="flex gap-2 flex-wrap mt-2 pt-4 border-t border-[var(--color-border)]">
-                          {statusCfg.next!.map((nextStatus) => {
-                            const nextCfg = STATUS_CONFIG[nextStatus]
-                            return (
-                              <motion.button
-                                key={nextStatus}
-                                whileTap={cardTap}
-                                onClick={() => handleStatusUpdate(delivery.id, nextStatus)}
-                                className="flex-1 py-3 rounded-xl text-white text-[13px] font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 cursor-pointer"
-                                style={{ backgroundColor: nextCfg.dot }}
-                              >
-                                {nextCfg.label}
-                                <ChevronRight className="w-3.5 h-3.5" />
-                              </motion.button>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </motion.div>
-                  )
-                })}
+                      <motion.button whileTap={tap}
+                        onClick={() => handleAcceptDelivery(delivery.id, delivery.orderId)}
+                        disabled={claimingId === delivery.id}
+                        className="w-full mt-4 py-3.5 rounded-xl bg-[#22C55E] text-[#052E16] font-bold text-[14px] hover:bg-[#16A34A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer">
+                        {claimingId === delivery.id ? <><RefreshCw className="w-4 h-4 animate-spin" />Tomando...</> : <><CheckCircle className="w-4 h-4" />Tomar pedido</>}
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                ))}
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.div>
+        </motion.section>
+
+        {/* ════════════════════════════════════════════════════════════
+            ENTREGA ACTIVA
+        ════════════════════════════════════════════════════════════ */}
+        {activeDeliveries.length > 0 && (
+          <motion.section variants={container} initial="hidden" animate="show" className="mb-6">
+            <motion.div variants={item} className="flex items-center gap-2 mb-3">
+              <MapPin className="w-5 h-5 text-[#3B82F6]" />
+              <h2 className="text-[15px] font-bold text-[var(--color-foreground)]">Entrega Activa</h2>
+              <span className="ml-auto px-2.5 py-0.5 rounded-full bg-[#3B82F6]/10 text-[11px] font-bold text-[#3B82F6] border border-[#3B82F6]/20">
+                {activeDeliveries.length}
+              </span>
+            </motion.div>
+
+            <AnimatePresence>
+              {activeDeliveries.map((delivery: any) => {
+                const cfg = DELIVERY_STATUS[delivery.status] || DELIVERY_STATUS.PENDING
+                const canAdvance = cfg.next && cfg.next.length > 0
+
+                return (
+                  <motion.div key={delivery.id} variants={item}
+                    className="bg-[var(--color-muted)] rounded-2xl border border-[var(--color-border)] p-5 mb-3 overflow-hidden">
+                    {/* Header row */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[14px] font-mono font-bold text-[var(--color-foreground)]">#{delivery.orderId?.slice(0, 8)}</span>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+                            style={{ backgroundColor: cfg.bg, color: cfg.color }}>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cfg.dot }} />
+                            {cfg.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[12px] text-[var(--color-muted-foreground)]">
+                          <Clock className="w-3 h-3" />
+                          {new Date(delivery.createdAt).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                      {/* Timeline dots */}
+                      <div className="flex flex-col items-center gap-1.5 pt-1">
+                        {['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED'].map((s, i) => {
+                          const isCurrent = delivery.status === s
+                          const isPast = ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED'].indexOf(delivery.status) > i
+                          const stepCfg = DELIVERY_STATUS[s]
+                          return (
+                            <div key={s} className="flex items-center gap-1.5">
+                              <div className={`w-2.5 h-2.5 rounded-full border ${isCurrent ? 'border-[var(--color-foreground)]' : 'border-[var(--color-border)]'} ${isPast || isCurrent ? '' : 'bg-transparent'}`}
+                                style={{ backgroundColor: isPast || isCurrent ? stepCfg?.dot : 'transparent' }} />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Context hints */}
+                    {delivery.status === 'ASSIGNED' && (
+                      <div className="flex items-center gap-2 p-3 rounded-xl bg-[#3B82F6]/5 border border-[#3B82F6]/20 mb-4">
+                        <MapPin className="w-4 h-4 text-[#3B82F6]" />
+                        <span className="text-[13px] text-[#3B82F6] font-medium">Recoge en restaurante</span>
+                        <Navigation className="w-4 h-4 text-[#3B82F6] ml-auto" />
+                      </div>
+                    )}
+                    {delivery.status === 'PICKED_UP' && (
+                      <div className="flex items-center gap-2 p-3 rounded-xl bg-[#F59E0B]/5 border border-[#F59E0B]/20 mb-4">
+                        <Package className="w-4 h-4 text-[#F59E0B]" />
+                        <span className="text-[13px] text-[#F59E0B] font-medium">Paquete recogido — dirigirte al cliente</span>
+                        <Navigation className="w-4 h-4 text-[#F59E0B] ml-auto" />
+                      </div>
+                    )}
+                    {delivery.status === 'IN_TRANSIT' && (
+                      <div className="flex items-center gap-2 p-3 rounded-xl bg-[#8B5CF6]/5 border border-[#8B5CF6]/20 mb-4">
+                        <Navigation className="w-4 h-4 text-[#8B5CF6]" />
+                        <span className="text-[13px] text-[#8B5CF6] font-medium">En camino al cliente</span>
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    {canAdvance && (
+                      <div className="flex gap-2 pt-3 border-t border-[var(--color-border)]">
+                        {cfg.next!.map(nextStatus => {
+                          const nextCfg = DELIVERY_STATUS[nextStatus]
+                          return (
+                            <motion.button key={nextStatus} whileTap={tap}
+                              onClick={() => handleStatusUpdate(delivery.id, nextStatus)}
+                              className="flex-1 py-3 rounded-xl text-white text-[13px] font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 cursor-pointer"
+                              style={{ backgroundColor: nextCfg?.dot }}>
+                              {NEXT_ACTION[nextStatus]}
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </motion.button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
+          </motion.section>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════
+            HISTORIAL
+        ════════════════════════════════════════════════════════════ */}
+        {completedDeliveries.length > 0 && (
+          <motion.section variants={container} initial="hidden" animate="show">
+            <motion.div variants={item} className="flex items-center gap-2 mb-3">
+              <CheckCircle className="w-5 h-5 text-[var(--color-muted-foreground)]" />
+              <h2 className="text-[15px] font-bold text-[var(--color-muted-foreground)]">Historial</h2>
+              <span className="ml-auto px-2.5 py-0.5 rounded-full bg-[var(--color-muted)] text-[11px] font-bold text-[var(--color-muted-foreground)] border border-[var(--color-border)]">
+                {completedDeliveries.length}
+              </span>
+            </motion.div>
+
+            <motion.div variants={{ show: { transition: { staggerChildren: 0.05 } } }} initial="hidden" animate="show" className="space-y-2">
+              {completedDeliveries.map((delivery: any) => {
+                const cfg = DELIVERY_STATUS[delivery.status] || DELIVERY_STATUS.PENDING
+                return (
+                  <motion.div key={delivery.id} variants={item}
+                    className="flex items-center justify-between p-4 rounded-xl bg-[var(--color-muted)] border border-[var(--color-border)]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: cfg.bg }}>
+                        <CheckCircle className="w-4 h-4" style={{ color: cfg.color }} />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-mono font-semibold text-[var(--color-foreground)]">#{delivery.orderId?.slice(0, 8)}</p>
+                        <p className="text-[11px] text-[var(--color-muted-foreground)]">
+                          {new Date(delivery.createdAt).toLocaleString('es-MX', { month: 'short', day: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-bold" style={{ color: cfg.color }}>{cfg.label}</span>
+                  </motion.div>
+                )
+              })}
+            </motion.div>
+          </motion.section>
+        )}
       </main>
     </PageTransition>
   )
