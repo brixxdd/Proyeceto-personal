@@ -199,6 +199,7 @@ export default function RestaurantDashboard() {
             next: ({ data }) => {
                 // El proxy pasa el mensaje al order-service que resuelve restaurantOrderCreated
                 if (data?.restaurantOrderCreated) {
+                    console.log('[RestaurantDashboard] WS received new order:', data.restaurantOrderCreated.status)
                     const newOrder = data.restaurantOrderCreated
                     setLocalOrders(prev => {
                         const exists = prev.some(o => o.id === newOrder.id)
@@ -281,8 +282,13 @@ export default function RestaurantDashboard() {
     }, [restaurantsLoading, restaurantsError, restaurantsData, restaurants, navigate])
 
     async function handleStatusUpdate(orderId: string, newStatus: string) {
+        // Optimistic update: update local state immediately for instant UI feedback
+        setLocalOrders(prev => prev.map(o =>
+            o.id === orderId ? { ...o, status: newStatus } : o
+        ))
         await updateOrderStatus({ variables: { id: orderId, status: newStatus } })
-        await refetchOrders()
+        // No refetch — the subscription delivers the confirmed state instantly.
+        // refetchOrders() here can interfere by resetting local state mid-update.
     }
 
     async function handleToggleOpen() {

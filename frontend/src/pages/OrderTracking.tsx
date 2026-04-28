@@ -95,14 +95,13 @@ export default function OrderTracking() {
   useEffect(() => {
     if (data?.order) {
       setCurrentOrder((prev: any) => {
-        // Si la subscription ya actualizó el estado a algo más reciente,
-        // no revertirlo con datos más viejos del poll
-        if (prev && data.order.status !== prev.status) {
-          // Usar updatedAt para determinar cuál es más reciente
+        if (prev) {
           const pollTime = new Date(data.order.updatedAt || data.order.createdAt).getTime()
           const prevTime = new Date(prev.updatedAt || prev.createdAt || 0).getTime()
-          if (pollTime > prevTime) return { ...prev, ...data.order }
-          return prev  // la subscription ya tiene datos más frescos
+          // Only accept poll data if it's meaningfully newer (>1s) than subscription data
+          // This prevents the poll from overwriting a fresh subscription update
+          if (pollTime > prevTime + 1000) return { ...prev, ...data.order }
+          return prev
         }
         return { ...prev, ...data.order }
       })
@@ -122,6 +121,7 @@ export default function OrderTracking() {
       next: ({ data: subData }) => {
         if (subData?.orderStatusChanged) {
           const updatedOrder = subData.orderStatusChanged
+          console.log('[OrderTracking] WS received:', updatedOrder.status)
           // setState directo: React siempre re-renderiza, sin depender de cache keys
           setCurrentOrder((prev: any) => ({
             ...prev,
