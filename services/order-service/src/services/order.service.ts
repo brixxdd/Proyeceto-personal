@@ -56,6 +56,9 @@ export class OrderService {
     // Notify restaurant dashboard subscribers (real-time new order)
     await this.pubSub.publish(restaurantNewOrderChannel(order.restaurantId), order);
 
+    // Notify customer subscribers (myOrdersUpdated subscription)
+    await this.pubSub.publish(userOrderUpdatedChannel(order.customerId), order);
+
     logger.info(`Order created: ${order.id}`);
     return order;
   }

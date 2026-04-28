@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { motion, type Variants } from 'framer-motion'
 import { Clock, ChevronRight, ShoppingBag } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
-import { useEffect } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 const GET_ORDERS = gql`
   query GetOrders {
@@ -28,13 +28,13 @@ const MY_ORDERS_UPDATED = gql`
 `
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  PENDING:    { label: 'Pendiente',  color: '#92400E', bg: '#FEF3C7' },
-  CONFIRMED:  { label: 'Confirmado', color: '#1D4ED8', bg: '#DBEAFE' },
-  PREPARING:  { label: 'Preparando', color: '#6D28D9', bg: '#EDE9FE' },
-  READY:      { label: 'Listo',      color: '#065F46', bg: '#D1FAE5' },
-  DELIVERING: { label: 'En camino',  color: '#9A3412', bg: '#FFF1E8' },
-  DELIVERED:  { label: 'Entregado',  color: '#065F46', bg: '#DCFCE7' },
-  CANCELLED:  { label: 'Cancelado',  color: '#991B1B', bg: '#FEE2E2' },
+  PENDING: { label: 'Pendiente', color: '#92400E', bg: '#FEF3C7' },
+  CONFIRMED: { label: 'Confirmado', color: '#1D4ED8', bg: '#DBEAFE' },
+  PREPARING: { label: 'Preparando', color: '#6D28D9', bg: '#EDE9FE' },
+  READY: { label: 'Listo', color: '#065F46', bg: '#D1FAE5' },
+  DELIVERING: { label: 'En camino', color: '#9A3412', bg: '#FFF1E8' },
+  DELIVERED: { label: 'Entregado', color: '#065F46', bg: '#DCFCE7' },
+  CANCELLED: { label: 'Cancelado', color: '#991B1B', bg: '#FEE2E2' },
 }
 
 const itemVariants: Variants = {
@@ -44,7 +44,20 @@ const itemVariants: Variants = {
 
 export default function Orders() {
   const client = useApolloClient()
-  const { data, loading, error } = useQuery<any>(GET_ORDERS)
+  const [localOrders, setLocalOrders] = useState<any[]>([])
+
+  const { data, loading, error } = useQuery<any>(GET_ORDERS, {
+    fetchPolicy: 'network-only',
+    pollInterval: 6000,
+    notifyOnNetworkStatusChange: false,
+  })
+
+  // Sync query results to local state
+  useEffect(() => {
+    if (data?.orders) {
+      setLocalOrders(data.orders)
+    }
+  }, [data])
 
   useEffect(() => {
     const observable = client.subscribe<any>({
@@ -55,13 +68,13 @@ export default function Orders() {
       next: ({ data }) => {
         if (data?.myOrdersUpdated) {
           const updatedOrder = data.myOrdersUpdated
-          client.cache.modify({
-            id: client.cache.identify({ __typename: 'Order', id: updatedOrder.id }),
-            fields: {
-              status() { return updatedOrder.status },
-              totalAmount() { return updatedOrder.totalAmount },
-              updatedAt() { return updatedOrder.updatedAt },
+          console.log('[Orders] WS received:', updatedOrder.status)
+          setLocalOrders(prev => {
+            const exists = prev.some(o => o.id === updatedOrder.id)
+            if (exists) {
+              return prev.map(o => o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o)
             }
+            return [updatedOrder, ...prev]
           })
         }
       },
@@ -70,6 +83,8 @@ export default function Orders() {
 
     return () => subscription.unsubscribe()
   }, [client])
+
+  const orders = localOrders
 
   if (loading) return (
     <PageTransition>
@@ -101,7 +116,7 @@ export default function Orders() {
       <main className="max-w-2xl mx-auto px-4 py-10 pb-28 md:pb-10">
         <h1 className="text-3xl font-bold mb-8">Mis pedidos</h1>
 
-        {data?.orders?.length === 0 && (
+        {orders?.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -136,7 +151,7 @@ export default function Orders() {
           initial="initial"
           animate="animate"
         >
-          {data?.orders?.map((order: any) => {
+          {orders?.map((order: any) => {
             const status = STATUS_CONFIG[order.status] ?? { label: order.status, color: '#6B7280', bg: 'var(--color-muted)' }
             return (
               <motion.div key={order.id} variants={itemVariants}>

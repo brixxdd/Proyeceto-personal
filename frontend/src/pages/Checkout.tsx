@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation } from '@apollo/client/react'
+import { useMutation, useApolloClient } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { motion } from 'framer-motion'
 import { MapPin, CreditCard, Truck, CheckCircle } from 'lucide-react'
@@ -21,6 +21,7 @@ const CREATE_ORDER = gql`
 
 export default function Checkout() {
     const navigate = useNavigate()
+    const client = useApolloClient()
     const { items, total, restaurantId, restaurantName, clearCart, isEmpty } = useCart()
     const [step, setStep] = useState<'address' | 'payment' | 'confirmation'>('address')
     const [orderId, setOrderId] = useState<string | null>(null)
@@ -71,6 +72,8 @@ export default function Checkout() {
                 setEstimatedDelivery(order.estimatedDeliveryTime)
                 setStep('confirmation')
                 clearCart()
+                // Refetch orders so Orders.tsx shows the new order immediately on navigation
+                client.refetchQueries({ include: ['GetOrders'] })
             }
         } catch (err) {
             console.error('Failed to create order:', err)
