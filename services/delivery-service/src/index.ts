@@ -84,6 +84,7 @@ const resolvers = {
     delivery: deliveryResolver.getDelivery.bind(deliveryResolver),
     deliveries: deliveryResolver.getDeliveries.bind(deliveryResolver),
     availableDrivers: deliveryResolver.getAvailableDrivers.bind(deliveryResolver),
+    availableDeliveries: deliveryResolver.getAvailableDeliveries.bind(deliveryResolver),
     deliveryPerson: deliveryResolver.getDeliveryPerson.bind(deliveryResolver),
     myDeliveryPerson: deliveryResolver.getMyDeliveryPerson.bind(deliveryResolver),
     myDeliveries: deliveryResolver.getMyDeliveries.bind(deliveryResolver),

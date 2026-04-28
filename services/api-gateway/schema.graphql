@@ -180,7 +180,7 @@ type DeliveryPerson {
 type Delivery {
   id: ID!
   orderId: ID!
-  deliveryPersonId: ID!
+  deliveryPersonId: ID
   status: DeliveryStatus!
   pickupTime: DateTime
   deliveryTime: DateTime

@@ -38,7 +38,7 @@ type DeliveryPerson @key(fields: "id") {
 type Delivery @key(fields: "id") {
   id: ID!
   orderId: ID!
-  deliveryPersonId: ID!
+  deliveryPersonId: ID
   status: DeliveryStatus!
   pickupTime: DateTime
   deliveryTime: DateTime

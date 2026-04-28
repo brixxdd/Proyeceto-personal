@@ -171,15 +171,24 @@ export class DeliveryService {
     return this.repo.findDeliveries({ deliveryPersonId });
   }
 
-  async acceptDelivery(deliveryId: string, deliveryPersonId: string): Promise<Delivery> {
+  async acceptDelivery(orderId: string, deliveryPersonId: string): Promise<Delivery> {
+    // First find the delivery by orderId to get its UUID
+    const deliveryRecord = await this.repo.findDeliveryByOrderId(orderId);
+    if (!deliveryRecord) {
+      throw new Error(`No delivery found for order ${orderId}`);
+    }
+    if (deliveryRecord.status !== 'PENDING' || deliveryRecord.deliveryPersonId) {
+      throw new Error(`Delivery ${deliveryRecord.id} is no longer available`);
+    }
+
     // Use atomic claim — DB-level check ensures only ONE driver gets the delivery
-    const delivery = await this.repo.claimDelivery(deliveryId, deliveryPersonId);
+    const delivery = await this.repo.claimDelivery(deliveryRecord.id, deliveryPersonId);
     if (!delivery) {
-      throw new Error(`Delivery ${deliveryId} is no longer available`);
+      throw new Error(`Delivery ${deliveryRecord.id} is no longer available`);
     }
 
     await this.repo.updateDriverStatus(deliveryPersonId, 'BUSY');
-    await this.pubSub.publish(deliveryStatusChannel(deliveryId), delivery);
+    await this.pubSub.publish(deliveryStatusChannel(delivery.id), delivery);
     await this.pubSub.publish(myDeliveryUpdatesChannel(deliveryPersonId), delivery);
 
     return delivery;

@@ -143,7 +143,7 @@ export default function DeliveryDashboard() {
     }
   }, [profileData])
 
-  const { data: deliveriesData, loading: deliveriesLoading } = useQuery<any>(GET_MY_DELIVERIES, {
+  const { data: deliveriesData, loading: deliveriesLoading, refetch: refetchMyDeliveries } = useQuery<any>(GET_MY_DELIVERIES, {
     variables: { deliveryPersonId: myDeliveryPersonId },
     skip: !myDeliveryPersonId,
   })
@@ -260,7 +260,10 @@ export default function DeliveryDashboard() {
         console.log('[DeliveryDashboard] Claimed delivery:', deliveryId)
         setLocalAvailable(prev => prev.filter(d => d.id !== deliveryId))
         setNewDeliveryCount(0)
+        // Add to localDeliveries optimistically and refetch
+        setLocalDeliveries(prev => [...prev, { ...accepted }])
         await refetchAvailable()
+        await refetchMyDeliveries()
       }
     } catch (err: any) {
       console.error('[DeliveryDashboard] Failed to claim delivery:', err.message)
@@ -339,16 +342,14 @@ export default function DeliveryDashboard() {
                       key={v.value}
                       type="button"
                       onClick={() => setProfileForm(f => ({ ...f, vehicleType: v.value }))}
-                      className={`p-3 rounded-[16px] border text-center transition-all ${
-                        profileForm.vehicleType === v.value
-                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
-                          : 'border-[var(--color-border)] bg-[var(--color-muted)] hover:bg-[var(--color-card)]'
-                      }`}
+                      className={`p-3 rounded-[16px] border text-center transition-all ${profileForm.vehicleType === v.value
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
+                        : 'border-[var(--color-border)] bg-[var(--color-muted)] hover:bg-[var(--color-card)]'
+                        }`}
                     >
                       <span className="text-2xl block mb-1">{v.icon}</span>
-                      <span className={`text-[12px] font-bold ${
-                        profileForm.vehicleType === v.value ? 'text-[var(--color-primary)]' : 'text-[var(--color-foreground)]'
-                      }`}>{v.label}</span>
+                      <span className={`text-[12px] font-bold ${profileForm.vehicleType === v.value ? 'text-[var(--color-primary)]' : 'text-[var(--color-foreground)]'
+                        }`}>{v.label}</span>
                     </button>
                   ))}
                 </div>
