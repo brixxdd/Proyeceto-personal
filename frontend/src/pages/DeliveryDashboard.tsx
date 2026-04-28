@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useApolloClient } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -15,9 +15,6 @@ import {
   CircleDot,
   RefreshCw,
   AlertCircle,
-  ToggleLeft,
-  ToggleRight,
-  Camera,
 } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
 import { slideUp, staggerContainer } from '../lib/animations'
@@ -181,6 +178,7 @@ function DriverAvatar({ vehicleType }: { vehicleType: string }) {
 export default function DeliveryDashboard() {
   const client = useApolloClient()
 
+  // ─── Estado local — ÚNICA fuente de verdad para la UI ───────────────────
   const [localDeliveries, setLocalDeliveries] = useState<any[]>([])
   const [localAvailable, setLocalAvailable] = useState<any[]>([])
   const [myDeliveryPersonId, setMyDeliveryPersonId] = useState<string | null>(null)
@@ -196,25 +194,46 @@ export default function DeliveryDashboard() {
     } catch { return null }
   }, [])
 
+  // ─── Perfil ──────────────────────────────────────────────────────────────
   const { data: profileData, loading: profileLoading } = useQuery<any>(GET_MY_PROFILE, {
     variables: { userId: userId || '' },
     skip: !userId,
   })
 
   useEffect(() => {
-    if (profileData?.myDeliveryPerson) setMyDeliveryPersonId(profileData.myDeliveryPerson.id)
+    if (profileData?.myDeliveryPerson) {
+      setMyDeliveryPersonId(profileData.myDeliveryPerson.id)
+    }
   }, [profileData])
 
+  // ─── Deliveries query — sincroniza estado local UNA SOLA VEZ ─────────────
+  // fetchPolicy: 'cache-and-network' → muestra cache inmediatamente, luego refetch en background
   const { data: deliveriesData, loading: deliveriesLoading, refetch: refetchMyDeliveries } = useQuery<any>(GET_MY_DELIVERIES, {
     variables: { deliveryPersonId: myDeliveryPersonId },
     skip: !myDeliveryPersonId,
+    fetchPolicy: 'cache-and-network',
   })
 
+  // Sync: solo se ejecuta cuando Apollo retorna datos reales (no cada render)
+  useEffect(() => {
+    if (deliveriesData?.myDeliveries) {
+      setLocalDeliveries(deliveriesData.myDeliveries)
+    }
+  }, [deliveriesData])
+
+  // ─── Available deliveries query ─────────────────────────────────────────
   const { data: availableData, loading: availableLoading, refetch: refetchAvailable } = useQuery<any>(GET_AVAILABLE_DELIVERIES, {
     pollInterval: 8000,
     notifyOnNetworkStatusChange: false,
   })
 
+  useEffect(() => {
+    if (availableData?.availableDeliveries) {
+      setLocalAvailable(availableData.availableDeliveries)
+    }
+  }, [availableData])
+
+  // ─── Mutations ──────────────────────────────────────────────────────────
   const [updateStatus] = useMutation<any>(UPDATE_DELIVERY_STATUS)
   const [acceptDeliveryMutation] = useMutation<any>(ACCEPT_DELIVERY)
   const [createDeliveryPerson, { loading: creatingProfile }] = useMutation<any>(CREATE_DELIVERY_PERSON, {
@@ -225,6 +244,60 @@ export default function DeliveryDashboard() {
 
   const [profileForm, setProfileForm] = useState({ name: '', vehicleType: 'BICYCLE' })
 
+  // ─── Subscription: Mis entregas ─────────────────────────────────────────
+  useEffect(() => {
+    if (!myDeliveryPersonId) return
+
+    const observable = client.subscribe<any>({
+      query: MY_DELIVERY_UPDATES,
+      variables: { deliveryPersonId: myDeliveryPersonId },
+    })
+
+    const subscription = observable.subscribe({
+      next: ({ data }: any) => {
+        if (data?.myDeliveryUpdates) {
+          const updated = data.myDeliveryUpdates
+          console.log('[DD] WS myDeliveryUpdates:', updated.status)
+          setLocalDeliveries(prev => {
+            const exists = prev.some(d => d.id === updated.id)
+            if (exists) {
+              // Merge: actualizar solo campos que vienen en la actualización
+              return prev.map(d => d.id === updated.id ? { ...d, ...updated } : d)
+            }
+            // Prepend: agregar al inicio (más nuevo primero)
+            return [updated, ...prev]
+          })
+        }
+      },
+      error: (err: any) => console.error('[DD] Sub error:', err),
+    })
+
+    return () => subscription.unsubscribe()
+  }, [myDeliveryPersonId, client])
+
+  // ─── Subscription: Nuevos pedidos disponibles ──────────────────────────
+  useEffect(() => {
+    const observable = client.subscribe<any>({ query: NEW_AVAILABLE_DELIVERY })
+
+    const subscription = observable.subscribe({
+      next: ({ data }: any) => {
+        if (data?.newAvailableDelivery) {
+          const nd = data.newAvailableDelivery
+          console.log('[DD] WS newAvailableDelivery:', nd.orderId)
+          setLocalAvailable(prev => {
+            if (prev.some(d => d.id === nd.id)) return prev
+            setNewDeliveryCount(c => c + 1)
+            return [nd, ...prev]
+          })
+        }
+      },
+      error: (err: any) => console.error('[DD] Avail sub error:', err),
+    })
+
+    return () => subscription.unsubscribe()
+  }, [client])
+
+  // ─── Handlers ────────────────────────────────────────────────────────────
   async function handleCreateProfile(e: React.FormEvent) {
     e.preventDefault()
     if (!userId || !profileForm.name) return
@@ -236,52 +309,20 @@ export default function DeliveryDashboard() {
     }
   }
 
-  useEffect(() => { if (deliveriesData?.myDeliveries) setLocalDeliveries(deliveriesData.myDeliveries) }, [deliveriesData])
-  useEffect(() => { if (availableData?.availableDeliveries) setLocalAvailable(availableData.availableDeliveries) }, [availableData])
-
-  // Subscriptions
-  useEffect(() => {
-    if (!myDeliveryPersonId) return
-    const sub = client.subscribe<any>({ query: MY_DELIVERY_UPDATES, variables: { deliveryPersonId: myDeliveryPersonId } }).subscribe({
-      next: ({ data }: any) => {
-        if (data?.myDeliveryUpdates) {
-          setLocalDeliveries(prev => prev.map(d => d.id === data.myDeliveryUpdates.id ? { ...d, ...data.myDeliveryUpdates } : d))
-        }
-      },
-      error: (err: any) => console.error('[DD] Sub error:', err),
-    })
-    return () => sub.unsubscribe()
-  }, [myDeliveryPersonId, client])
-
-  useEffect(() => {
-    const sub = client.subscribe<any>({ query: NEW_AVAILABLE_DELIVERY }).subscribe({
-      next: ({ data }: any) => {
-        if (data?.newAvailableDelivery) {
-          const nd = data.newAvailableDelivery
-          setLocalAvailable(prev => {
-            if (prev.some(d => d.id === nd.id)) return prev
-            setNewDeliveryCount(c => c + 1)
-            return [nd, ...prev]
-          })
-        }
-      },
-      error: (err: any) => console.error('[DD] Avail sub error:', err),
-    })
-    return () => sub.unsubscribe()
-  }, [client])
-
+  // Accept: NO modifica estado local directamente.
+  // El mutation trigger -> subscription -> actualiza el estado.
+  // Solo remueve de la lista de disponibles localmente para feedback inmediato.
   async function handleAcceptDelivery(deliveryId: string, orderId: string) {
     if (!myDeliveryPersonId) return
     setClaimingId(deliveryId)
     try {
-      const { data } = await acceptDeliveryMutation({ variables: { orderId, deliveryPersonId: myDeliveryPersonId } })
-      if (data?.acceptDelivery) {
-        setLocalAvailable(prev => prev.filter(d => d.id !== deliveryId))
-        setNewDeliveryCount(0)
-        setLocalDeliveries(prev => [...prev, { ...data.acceptDelivery }])
-        await refetchAvailable()
-        await refetchMyDeliveries()
-      }
+      await acceptDeliveryMutation({
+        variables: { orderId, deliveryPersonId: myDeliveryPersonId },
+      })
+      // Remover de disponibles localmente — la subscription actualizará "mis entregas"
+      setLocalAvailable(prev => prev.filter(d => d.id !== deliveryId))
+      setNewDeliveryCount(0)
+      await refetchAvailable()
     } catch (err: any) {
       alert('Este pedido ya fue tomado por otro repartidor.')
       setLocalAvailable(prev => prev.filter(d => d.id !== deliveryId))
@@ -290,12 +331,12 @@ export default function DeliveryDashboard() {
     }
   }
 
+  // Status update: mutation only — la subscription se encarga de sincronizar
   async function handleStatusUpdate(deliveryId: string, newStatus: string) {
-    setLocalDeliveries(prev => prev.map(d => d.id === deliveryId ? { ...d, status: newStatus } : d))
     await updateStatus({ variables: { id: deliveryId, status: newStatus } })
   }
 
-  // ─── Auth ───────────────────────────────────────────────────────────────────────
+  // ─── Auth ───────────────────────────────────────────────────────────────
   if (!userId) return (
     <PageTransition>
       <div className="max-w-2xl mx-auto px-4 py-24 text-center">
@@ -306,7 +347,7 @@ export default function DeliveryDashboard() {
     </PageTransition>
   )
 
-  // ─── Profile loading ──────────────────────────────────────────────────────────
+  // ─── Loading skeleton ────────────────────────────────────────────────────
   if (profileLoading) return (
     <PageTransition>
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
@@ -317,7 +358,7 @@ export default function DeliveryDashboard() {
     </PageTransition>
   )
 
-  // ─── Onboarding ──────────────────────────────────────────────────────────────
+  // ─── Onboarding ──────────────────────────────────────────────────────────
   if (!profileData?.myDeliveryPerson) return (
     <PageTransition>
       <div className="max-w-xl mx-auto px-4 py-12">
@@ -371,20 +412,15 @@ export default function DeliveryDashboard() {
     <PageTransition>
       <main className="max-w-2xl mx-auto px-4 py-6 pb-36 md:pb-10">
 
-        {/* ════════════════════════════════════════════════════════════
-            DRIVER HEADER CARD
-        ════════════════════════════════════════════════════════════ */}
+        {/* DRIVER HEADER CARD */}
         <motion.div variants={container} initial="hidden" animate="show" className="mb-6">
           <motion.div variants={item} className="bg-[var(--color-muted)] rounded-2xl p-5 border border-[var(--color-border)]">
             <div className="flex items-center gap-4">
-              {/* Avatar + status dot */}
               <div className="relative shrink-0">
                 <DriverAvatar vehicleType={profile.vehicleType} />
                 <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[var(--color-muted)]"
                   style={{ backgroundColor: driverStatusCfg.color }} />
               </div>
-
-              {/* Name + vehicle + status */}
               <div className="flex-1 min-w-0">
                 <h1 className="text-lg font-bold text-[var(--color-foreground)] truncate">{profile.name}</h1>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -399,8 +435,6 @@ export default function DeliveryDashboard() {
                   </span>
                 </div>
               </div>
-
-              {/* Rating badge */}
               <div className="flex items-center gap-1.5 bg-[var(--color-background)] px-3 py-2 rounded-xl border border-[var(--color-border)] shrink-0">
                 <Star className="w-4 h-4 text-[#F59E0B] fill-[#F59E0B]" />
                 <span className="text-sm font-bold text-[var(--color-foreground)]">{profile.rating?.toFixed(1) || '5.0'}</span>
@@ -409,9 +443,7 @@ export default function DeliveryDashboard() {
           </motion.div>
         </motion.div>
 
-        {/* ════════════════════════════════════════════════════════════
-            PEDIDOS DISPONIBLES
-        ════════════════════════════════════════════════════════════ */}
+        {/* PEDIDOS DISPONIBLES — horizontal scroll cards */}
         <motion.section variants={container} initial="hidden" animate="show" className="mb-6">
           <motion.div variants={item} className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -433,9 +465,13 @@ export default function DeliveryDashboard() {
           </motion.div>
 
           <AnimatePresence mode="wait">
-            {availableLoading ? (
-              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-                <SkeletonCard /><SkeletonCard />
+            {availableLoading && localAvailable.length === 0 ? (
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
+                <div className="shrink-0 w-[260px] rounded-2xl bg-[var(--color-muted)] border border-[var(--color-border)] p-5 animate-pulse">
+                  <div className="h-3 w-20 rounded bg-[var(--color-border)] mb-3" />
+                  <div className="h-3 w-16 rounded bg-[var(--color-border)] mb-4" />
+                  <div className="h-10 w-full rounded-xl bg-[var(--color-border)]" />
+                </div>
               </motion.div>
             ) : localAvailable.length === 0 ? (
               <motion.div key="empty" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -450,7 +486,6 @@ export default function DeliveryDashboard() {
                 {localAvailable.map((delivery: any) => (
                   <motion.div key={delivery.id} variants={item}
                     className="shrink-0 w-[260px] bg-[var(--color-muted)] rounded-2xl border border-[#22C55E]/20 p-4 flex flex-col gap-3">
-                    {/* Top row */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <span className="text-[12px] font-mono font-bold text-[var(--color-foreground)]">#{delivery.orderId?.slice(0, 8)}</span>
@@ -460,14 +495,11 @@ export default function DeliveryDashboard() {
                       </div>
                       <span className="text-[10px] font-bold text-[#22C55E] bg-[#22C55E]/10 px-2 py-0.5 rounded-full">NUEVO</span>
                     </div>
-                    {/* Time */}
                     <div className="flex items-center gap-1 text-[11px] text-[var(--color-muted-foreground)]">
                       <Clock className="w-3 h-3" />
                       {new Date(delivery.createdAt).toLocaleString('es-MX', { hour: '2-digit', minute: '2-digit' })}
                     </div>
-                    {/* Spacer */}
                     <div className="flex-1" />
-                    {/* Action */}
                     <motion.button whileTap={tap}
                       onClick={() => handleAcceptDelivery(delivery.id, delivery.orderId)}
                       disabled={claimingId === delivery.id}
@@ -485,9 +517,7 @@ export default function DeliveryDashboard() {
           </AnimatePresence>
         </motion.section>
 
-        {/* ════════════════════════════════════════════════════════════
-            ENTREGA ACTIVA
-        ════════════════════════════════════════════════════════════ */}
+        {/* ENTREGA ACTIVA */}
         {activeDeliveries.length > 0 && (
           <motion.section variants={container} initial="hidden" animate="show" className="mb-6">
             <motion.div variants={item} className="flex items-center gap-2 mb-3">
@@ -506,7 +536,6 @@ export default function DeliveryDashboard() {
                 return (
                   <motion.div key={delivery.id} variants={item}
                     className="bg-[var(--color-muted)] rounded-2xl border border-[var(--color-border)] p-5 mb-3 overflow-hidden">
-                    {/* Header row */}
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <div className="flex items-center gap-2 mb-2">
@@ -530,7 +559,7 @@ export default function DeliveryDashboard() {
                           const stepCfg = DELIVERY_STATUS[s]
                           return (
                             <div key={s} className="flex items-center gap-1.5">
-                              <div className={`w-2.5 h-2.5 rounded-full border ${isCurrent ? 'border-[var(--color-foreground)]' : 'border-[var(--color-border)]'} ${isPast || isCurrent ? '' : 'bg-transparent'}`}
+                              <div className={`w-2.5 h-2.5 rounded-full border ${isCurrent ? 'border-[var(--color-foreground)]' : 'border-[var(--color-border)]'}`}
                                 style={{ backgroundColor: isPast || isCurrent ? stepCfg?.dot : 'transparent' }} />
                             </div>
                           )
@@ -538,7 +567,6 @@ export default function DeliveryDashboard() {
                       </div>
                     </div>
 
-                    {/* Context hints */}
                     {delivery.status === 'ASSIGNED' && (
                       <div className="flex items-center gap-2 p-3 rounded-xl bg-[#3B82F6]/5 border border-[#3B82F6]/20 mb-4">
                         <MapPin className="w-4 h-4 text-[#3B82F6]" />
@@ -560,7 +588,6 @@ export default function DeliveryDashboard() {
                       </div>
                     )}
 
-                    {/* Action buttons */}
                     {canAdvance && (
                       <div className="flex gap-2 pt-3 border-t border-[var(--color-border)]">
                         {cfg.next!.map(nextStatus => {
@@ -584,9 +611,7 @@ export default function DeliveryDashboard() {
           </motion.section>
         )}
 
-        {/* ════════════════════════════════════════════════════════════
-            HISTORIAL
-        ════════════════════════════════════════════════════════════ */}
+        {/* HISTORIAL */}
         {completedDeliveries.length > 0 && (
           <motion.section variants={container} initial="hidden" animate="show">
             <motion.div variants={item} className="flex items-center gap-2 mb-3">
