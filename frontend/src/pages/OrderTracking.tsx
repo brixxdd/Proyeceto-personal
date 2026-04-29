@@ -14,6 +14,7 @@ const GET_ORDER = gql`
       status
       totalAmount
       restaurantId
+      deliveryPersonId
       createdAt
       updatedAt
       items {
@@ -34,6 +35,7 @@ const ORDER_STATUS_SUBSCRIPTION = gql`
       status
       totalAmount
       restaurantId
+      deliveryPersonId
       createdAt
       updatedAt
       items {

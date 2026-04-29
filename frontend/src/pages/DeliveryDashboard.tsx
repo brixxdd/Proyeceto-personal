@@ -212,18 +212,24 @@ export default function DeliveryDashboard() {
     variables: { deliveryPersonId: myDeliveryPersonId },
     skip: !myDeliveryPersonId,
     fetchPolicy: 'cache-and-network',
+    pollInterval: 8000,
   })
 
-  // Sync: solo se ejecuta cuando Apollo retorna datos reales (no cada render)
+  // Sync: solo se ejecuta cuando Apollo retorna datos reales (no cada render).
+  // Solo poblamos si localDeliveries esta vacio — la subscription + mutation mantienen el estado.
   useEffect(() => {
     if (deliveriesData?.myDeliveries) {
-      setLocalDeliveries(deliveriesData.myDeliveries)
+      setLocalDeliveries((prev) => {
+        if (!prev || prev.length === 0) return deliveriesData.myDeliveries
+        return prev
+      })
     }
   }, [deliveriesData])
 
   // ─── Available deliveries query ─────────────────────────────────────────
   const { data: availableData, loading: availableLoading, refetch: refetchAvailable } = useQuery<any>(GET_AVAILABLE_DELIVERIES, {
     pollInterval: 8000,
+    fetchPolicy: 'cache-and-network',
     notifyOnNetworkStatusChange: false,
   })
 
@@ -316,10 +322,19 @@ export default function DeliveryDashboard() {
     if (!myDeliveryPersonId) return
     setClaimingId(deliveryId)
     try {
-      await acceptDeliveryMutation({
+      const { data: mutationData } = await acceptDeliveryMutation({
         variables: { orderId, deliveryPersonId: myDeliveryPersonId },
       })
-      // Remover de disponibles localmente — la subscription actualizará "mis entregas"
+
+      // Actualizar estado local INMEDIATAMENTE — la subscription es backup
+      if (mutationData?.acceptDelivery) {
+        const accepted = mutationData.acceptDelivery
+        setLocalDeliveries(prev => {
+          if (prev.some(d => d.id === accepted.id)) return prev
+          return [accepted, ...prev]
+        })
+      }
+
       setLocalAvailable(prev => prev.filter(d => d.id !== deliveryId))
       setNewDeliveryCount(0)
       await refetchAvailable()
