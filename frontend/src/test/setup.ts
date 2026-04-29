@@ -33,8 +33,11 @@ class IntersectionObserverMock {
     unobserve() { }
     disconnect() { }
     takeRecords(): IntersectionObserverEntry[] { return [] }
+    addEventListener() { }
+    removeEventListener() { }
+    dispatchEvent() { return false }
 }
-window.IntersectionObserver = IntersectionObserverMock
+window.IntersectionObserver = IntersectionObserverMock as unknown as typeof IntersectionObserver
 
 // Mock localStorage
 const localStorageMock = (() => {

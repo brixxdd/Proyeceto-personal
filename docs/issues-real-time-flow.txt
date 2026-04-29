@@ -1,0 +1,112 @@
+================================================================================
+ISSUES — FoodDash Real-Time Flow
+================================================================================
+Updated: 2026-04-29
+
+================================================================================
+ISSUE 1: OrderTracking salta el paso "Repartidor asignado"
+================================================================================
+Gravedad: MEDIA
+Descripción: Cuando el driver acepta un pedido en DeliveryDashboard, el
+stepper de OrderTracking salta directamente de "Listo para envío" a
+"Recogido", sin mostrar "Repartidor asignado" como estado actual.
+
+Flujo observado:
+  customer crea pedido → order.status = PENDING
+  owner marca Listo → order.status = READY
+  driver acepta → delivery.status = ASSIGNED
+  driver marca Recoger → delivery.status = PICKED_UP
+  driver marca En camino → delivery.status = IN_TRANSIT
+  driver marca Entregado → delivery.status = DELIVERED
+
+Problema en OrderTracking (frontend/src/pages/OrderTracking.tsx):
+  - El stepper muestra: Recibido → Confirmado → Preparando → Listo →
+    Repartidor asignado → Recogido → En camino → Entregado
+  - Cuando delivery pasa a ASSIGNED, order.status en order-service NO
+    cambia a ASSIGNED — permanece en READY. Por eso el stepper salta ese paso.
+
+Causa raíz: acceptDelivery (delivery-service) actualiza delivery.status a
+ASSIGNED pero NO sincroniza order.status a ASSIGNED. El OrderTracking
+consulta order.status del order-service, no el delivery.
+
+Solución propuesta:
+  - Option A: hacer que acceptDelivery también actualice order.status = ASSIGNED
+    vía el HTTP call que ya existe en updateDeliveryStatus
+  - Option B: modificar OrderTracking para que también muestre el estado
+    del delivery (deliveryPersonId) como paso "Repartidor asignado"
+  - Option C: publicar evento order.assigned cuando driver acepta y hacer
+    que order-service actualice order.status = ASSIGNED
+
+Estado: PENDIENTE
+
+================================================================================
+ISSUE 2: DeliveryDashboard no actualiza tras cambio de status
+================================================================================
+Gravedad: ALTA
+Descripción: Después de hacer clic en "Recoger pedido" (PICKED_UP) o
+"Cambiar estado" en DeliveryDashboard, la UI no refleja el cambio.
+El usuario debe recargar la página.
+
+Pasos observados:
+  1. Driver acepta pedido → aparece en "Entrega Activa" como ASSIGNED ✓
+  2. Driver toca "Recoger pedido" → el botón cambia a estado de carga
+     → desaparece → la entrega SIGUE apareciendo como ASSIGNED (no actualiza)
+  3. Lo mismo ocurre con "Ir al cliente" (IN_TRANSIT) y "Marcar entregado"
+
+Causa raíz: handleStatusUpdate (DeliveryDashboard.tsx) solo hace:
+  await updateStatus({ variables: { id: deliveryId, status: newStatus } })
+  - La mutation actualiza el servidor correctamente
+  - La subscription myDeliveryUpdates debería recibir el evento y actualizar
+  - PERO: delivery-service publica en myDeliveryUpdatesChannel solo cuando
+    updateDeliveryStatus es llamado desde delivery-service
+  - El frontend NO recibe el evento en la subscription
+
+  Posible problema adicional: fetchPolicy en GET_MY_DELIVERIES es
+  'cache-and-network' + pollInterval 8000, pero el sync effect
+  solo puebla si localDeliveries.length === 0.
+
+Solución propuesta:
+  - Verificar que myDeliveryUpdates subscription está recibiendo eventos
+  - handleStatusUpdate debería actualizar el estado local INMEDIATAMENTE
+    (optimistic update) igual que hace handleAcceptDelivery
+  - Verificar que el sync effect no está bloqueando la actualización
+
+Estado: PENDIENTE
+
+================================================================================
+ISSUE 3: OrderTracking no recibe actualizaciones en tiempo real
+================================================================================
+Gravedad: MEDIA
+Descripción: OrderTracking solo se actualiza cuando el usuario recarga
+la página. La subscription ORDER_STATUS_SUBSCRIPTION parece no recibir
+eventos.
+
+Pasos observados:
+  1. customer crea pedido → OrderTracking muestra estado correcto
+  2. owner marca Listo → OrderTracking NO actualiza (debe recargar)
+  3. driver acepta → OrderTracking NO actualiza (debe recargar)
+
+Causa raíz probable:
+  - La subscription usa orderStatusChannel(orderId) en order-service
+  - order-service publica en ese canal cuando order.status cambia
+  - PERO: cuando solo cambia delivery.status (delivery-service), el
+    order-service NO publica en orderStatusChanged
+  - El delivery-service.syncDeliveryStatusToOrder no se está llamando
+    para todos los casos (PICKED_UP, IN_TRANSIT no deberían cambiar order)
+
+  Investigar: ¿order-service está publicando en orderStatusChanged cuando
+  order.status cambia a ASSIGNED?
+
+Estado: PENDIENTE
+
+================================================================================
+RESUMEN DE ACCIONES
+================================================================================
+1. [ISSUE 1] Investigar por qué order.status no cambia a ASSIGNED cuando
+   driver acepta. ¿Se está llamando updateOrderStatus en order-service?
+
+2. [ISSUE 2] Agregar optimistic update en handleStatusUpdate igual que en
+   handleAcceptDelivery. Verificar que la subscription sí recibe eventos.
+
+3. [ISSUE 3] Verificar que order-service publica en orderStatusChanged
+   cuando order.status cambia. Agregar logs en el pubSub.publish.

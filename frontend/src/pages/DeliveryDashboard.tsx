@@ -83,6 +83,8 @@ const MY_DELIVERY_UPDATES = gql`
       status
       pickupTime
       deliveryTime
+      createdAt
+      updatedAt
     }
   }
 `
@@ -145,7 +147,7 @@ const container = {
 }
 const item = {
   hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] as const } },
 }
 const tap = { rest: { scale: 1 }, pressed: { scale: 0.96 } }
 
@@ -346,8 +348,12 @@ export default function DeliveryDashboard() {
     }
   }
 
-  // Status update: mutation only — la subscription se encarga de sincronizar
+  // Status update: optimistic update inmediato, la subscription confirma después
   async function handleStatusUpdate(deliveryId: string, newStatus: string) {
+    // Optimistic: actualizar UI inmediatamente
+    setLocalDeliveries(prev => prev.map(d =>
+      d.id === deliveryId ? { ...d, status: newStatus } : d
+    ))
     await updateStatus({ variables: { id: deliveryId, status: newStatus } })
   }
 

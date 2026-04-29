@@ -5,7 +5,7 @@ import { createClient } from 'graphql-ws';
 import { getMainDefinition } from '@apollo/client/utilities';
 
 const httpLink = createHttpLink({
-  uri: '/graphql',
+  uri: import.meta.env.VITE_API_URL || '/graphql',
 });
 
 const authLink = setContext((_, { headers }) => {
@@ -21,7 +21,7 @@ const authLink = setContext((_, { headers }) => {
 // WebSocket link for subscriptions (graphql-ws protocol)
 const wsLink = new GraphQLWsLink(
   createClient({
-    url: `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/graphql`,
+    url: import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/graphql`,
     connectionParams: () => {
       const token = sessionStorage.getItem('token');
       return {
