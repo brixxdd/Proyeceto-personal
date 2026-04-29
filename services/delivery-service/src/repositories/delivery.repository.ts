@@ -29,10 +29,8 @@ export class DeliveryRepository {
   async findDeliveryPersonByUserId(userId: string): Promise<DeliveryPerson | null> {
     const result = await this.pool.query<DeliveryPersonRow>(
       `SELECT dp.* FROM delivery_people dp
-       LEFT JOIN deliveries d ON dp.id = d.delivery_person_id
        WHERE dp.user_id = $1
-       GROUP BY dp.id
-       ORDER BY COUNT(d.id) DESC, dp.created_at DESC
+       ORDER BY dp.created_at DESC
        LIMIT 1`,
       [userId],
     );

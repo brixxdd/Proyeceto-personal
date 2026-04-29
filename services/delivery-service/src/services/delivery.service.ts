@@ -2,8 +2,11 @@ import { Delivery, DeliveryPerson, DeliveryStatus, DriverStatus, Location, Vehic
 import { DeliveryRepository } from '../repositories/delivery.repository';
 import { KafkaProducer } from '../events/kafka.producer';
 import { RedisPubSub, deliveryStatusChannel, driverAssignedChannel, myDeliveryUpdatesChannel, newAvailableDeliveryChannel } from '../pubsub/redis.pubsub';
+import { fetchOrderDetails } from '../clients/order.client';
 import { logger } from '../utils/logger';
 import { deliveryAssignmentsTotal, activeDeliveries, availableDrivers } from '../metrics/prometheus';
+
+const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://localhost:3000/graphql';
 
 export class DeliveryService {
   constructor(
@@ -90,6 +93,43 @@ export class DeliveryService {
     // Publish GraphQL subscription event
     await this.pubSub.publish(deliveryStatusChannel(id), delivery);
     await this.pubSub.publish(myDeliveryUpdatesChannel(delivery.deliveryPersonId), delivery);
+
+    // Map delivery status → order status and sync to order-service via HTTP
+    const orderStatusMap: Record<DeliveryStatus, string> = {
+      PENDING: 'PENDING',
+      ASSIGNED: 'ASSIGNED',
+      PICKED_UP: 'PICKED_UP',
+      IN_TRANSIT: 'IN_TRANSIT',
+      DELIVERED: 'DELIVERED',
+      CANCELLED: 'CANCELLED',
+    };
+    const orderStatus = orderStatusMap[status];
+    if (orderStatus) {
+      try {
+        const mutation = `
+          mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
+            updateOrderStatus(id: $id, status: $status) { id status }
+          }
+        `;
+        const authHeaders = {
+          'x-user-id': 'a0000000-0000-0000-0000-000000000001',
+          'x-user-email': 'admin@fooddash.com',
+          'x-user-role': 'ADMIN',
+        };
+        const order = await fetchOrderDetails(delivery.orderId, ORDER_SERVICE_URL, authHeaders);
+        await fetch(`${ORDER_SERVICE_URL}/graphql`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
+          body: JSON.stringify({
+            query: mutation,
+            variables: { id: order.id, status: orderStatus },
+          }),
+        });
+        logger.info(`Synced delivery status ${status} → order ${order.id}`);
+      } catch (err) {
+        logger.error(`Failed to sync delivery status to order-service for delivery ${id}`, err);
+      }
+    }
 
     // When delivered, release the driver
     if (status === 'DELIVERED') {
@@ -188,6 +228,16 @@ export class DeliveryService {
     }
 
     await this.repo.updateDriverStatus(deliveryPersonId, 'BUSY');
+
+    // Publish Kafka event so order-service can update order.status = ASSIGNED
+    await this.kafkaProducer.publishDeliveryAssigned({
+      orderId,
+      deliveryPersonId,
+      estimatedMinutes: 25,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Publish GraphQL subscription events
     await this.pubSub.publish(deliveryStatusChannel(delivery.id), delivery);
     await this.pubSub.publish(myDeliveryUpdatesChannel(deliveryPersonId), delivery);
 

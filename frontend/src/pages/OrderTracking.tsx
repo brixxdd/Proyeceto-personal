@@ -85,7 +85,7 @@ export default function OrderTracking() {
   const { data, loading, error } = useQuery<any>(GET_ORDER, {
     variables: { id },
     fetchPolicy: 'network-only',
-    pollInterval: 4000,                    // red de seguridad: refresca cada 4s
+    pollInterval: 2000,                   // red de seguridad: refresca cada 2s
     notifyOnNetworkStatusChange: false,    // sin skeleton flash en cada poll
   })
 

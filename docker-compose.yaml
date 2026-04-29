@@ -288,6 +288,7 @@ services:
       KAFKA_BROKERS: kafka:29092
       KAFKA_CLIENT_ID: delivery-service
       KAFKA_GROUP_ID: delivery-service-group
+      ORDER_SERVICE_URL: http://order-service:3000/graphql
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       SERVICE_NAME: delivery-service
     ports:

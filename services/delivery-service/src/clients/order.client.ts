@@ -51,6 +51,7 @@ export interface OrderDetails {
 export async function fetchOrderDetails(
   orderId: string,
   orderServiceUrl: string,
+  extraHeaders?: Record<string, string>,
 ): Promise<OrderDetails> {
   const query = `
     query GetOrder($id: ID!) {
@@ -87,7 +88,7 @@ export async function fetchOrderDetails(
 
   const response = await fetch(`${orderServiceUrl}/graphql`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...extraHeaders },
     body: JSON.stringify({ query, variables: { id: orderId } }),
   });
 
