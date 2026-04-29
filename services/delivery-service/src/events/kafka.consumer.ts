@@ -138,11 +138,9 @@ export class KafkaConsumer {
   private async handleOrderCreated(event: OrderCreatedPayload): Promise<void> {
     const { orderId } = event;
     logger.info(`Handling order.created event for order ${orderId}`);
-
-    const delivery = await this.deliveryService.assignDelivery(orderId);
-    if (!delivery) {
-      logger.warn(`Could not assign delivery for order ${orderId} — no available drivers`);
-    }
+    // Pre-create delivery record as PENDING so acceptDelivery can find it when order becomes READY.
+    // Do NOT broadcast — driver should only see it when restaurant is ready.
+    await this.deliveryService.createPendingDelivery(orderId);
   }
 
   private async handleOrderCancelled(event: OrderCancelledPayload): Promise<void> {
@@ -154,11 +152,13 @@ export class KafkaConsumer {
   private async handleOrderReady(event: OrderReadyPayload): Promise<void> {
     const { orderId } = event;
     logger.info(`Handling order.ready event for order ${orderId}`);
-    // On READY, create a PENDING delivery record (no driver assigned yet)
-    // Drivers can then claim it via acceptDelivery
-    const delivery = await this.deliveryService.createPendingDelivery(orderId);
+    // Update order_status to READY in the delivery record so findAvailableDeliveries picks it up
+    await this.deliveryService.updateDeliveryOrderStatus(orderId, 'READY');
+    // Broadcast so drivers finally see it in "Pedidos Disponibles"
+    const delivery = await this.deliveryService.createPendingDelivery(orderId, 'READY');
     if (delivery) {
-      logger.info(`Created pending delivery ${delivery.id} for order ${orderId}`);
+      await this.deliveryService.broadcastAvailableDelivery(orderId);
+      logger.info(`Broadcasted available delivery ${delivery.id} for order ${orderId}`);
     }
   }
 

@@ -24,6 +24,7 @@ export interface Delivery {
   orderId: string;
   deliveryPersonId: string;
   status: DeliveryStatus;
+  orderStatus: string;
   pickupTime: Date | null;
   deliveryTime: Date | null;
   currentLocation: Location | null;
@@ -49,6 +50,7 @@ export interface DeliveryRow {
   order_id: string;
   delivery_person_id: string;
   status: string;
+  order_status: string;
   pickup_time: Date | null;
   delivery_time: Date | null;
   current_location: Location | null;
@@ -76,6 +78,7 @@ export function mapDelivery(row: DeliveryRow): Delivery {
     orderId: row.order_id,
     deliveryPersonId: row.delivery_person_id,
     status: row.status as DeliveryStatus,
+    orderStatus: row.order_status,
     pickupTime: row.pickup_time,
     deliveryTime: row.delivery_time,
     currentLocation: row.current_location,

@@ -187,24 +187,40 @@ export class DeliveryService {
   }
 
   /**
-   * Creates a PENDING delivery record when an order becomes READY.
-   * Broadcasts the new available delivery to all delivery people via Redis PubSub.
+   * Creates a PENDING delivery record when an order is CONFIRMED (pre-create for idempotency).
+   * Does NOT broadcast — drivers only see it when order becomes READY via handleOrderReady.
    */
-  async createPendingDelivery(orderId: string): Promise<Delivery | null> {
+  async createPendingDelivery(orderId: string, orderStatus = 'PENDING'): Promise<Delivery | null> {
     const existing = await this.repo.findDeliveryByOrderId(orderId);
     if (existing) {
       // Already exists, no need to create again
       return existing;
     }
 
-    const delivery = await this.repo.createPendingDelivery(orderId);
+    const delivery = await this.repo.createPendingDelivery(orderId, orderStatus);
     if (delivery) {
-      await this.pubSub.publish(newAvailableDeliveryChannel(), delivery);
       const avail = await this.repo.countAvailableDrivers();
       availableDrivers.set(avail);
     }
 
     return delivery;
+  }
+
+  /**
+   * Broadcasts an existing PENDING delivery to all drivers.
+   * Called when order transitions to READY so drivers finally see it.
+   */
+  async broadcastAvailableDelivery(orderId: string): Promise<void> {
+    const delivery = await this.repo.findDeliveryByOrderId(orderId);
+    if (!delivery) {
+      logger.warn(`No delivery found for order ${orderId} to broadcast`);
+      return;
+    }
+    await this.pubSub.publish(newAvailableDeliveryChannel(), delivery);
+  }
+
+  async updateDeliveryOrderStatus(orderId: string, orderStatus: string): Promise<void> {
+    await this.repo.updateDeliveryOrderStatus(orderId, orderStatus);
   }
 
   async getMyDeliveries(deliveryPersonId: string): Promise<Delivery[]> {

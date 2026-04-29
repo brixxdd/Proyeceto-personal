@@ -55,9 +55,11 @@ export class DeliveryRepository {
 
   async findAvailableDeliveries(): Promise<Delivery[]> {
     const result = await this.pool.query<DeliveryRow>(
-      `SELECT d.* FROM deliveries d
-       WHERE d.status = 'PENDING' AND d.delivery_person_id IS NULL
-       ORDER BY d.created_at ASC`,
+      `SELECT * FROM deliveries
+       WHERE status = 'PENDING'
+         AND delivery_person_id IS NULL
+         AND order_status = 'READY'
+       ORDER BY created_at ASC`,
     );
     return result.rows.map(mapDelivery);
   }
@@ -144,16 +146,15 @@ export class DeliveryRepository {
     return mapDelivery(result.rows[0]);
   }
 
-  async createPendingDelivery(orderId: string): Promise<Delivery> {
+  async createPendingDelivery(orderId: string, orderStatus = 'PENDING'): Promise<Delivery> {
     const result = await this.pool.query<DeliveryRow>(
-      `INSERT INTO deliveries (order_id, delivery_person_id, status)
-       VALUES ($1, NULL, 'PENDING')
+      `INSERT INTO deliveries (order_id, delivery_person_id, status, order_status)
+       VALUES ($1, NULL, 'PENDING', $2)
        ON CONFLICT (order_id) DO NOTHING
        RETURNING *`,
-      [orderId],
+      [orderId, orderStatus],
     );
     if (result.rows.length === 0) {
-      // Already exists, try to find it
       const existing = await this.findDeliveryByOrderId(orderId);
       if (!existing) throw new Error(`Could not create or find delivery for order ${orderId}`);
       return existing;
@@ -178,6 +179,13 @@ export class DeliveryRepository {
     );
     if (result.rows.length === 0) return null;
     return mapDelivery(result.rows[0]);
+  }
+
+  async updateDeliveryOrderStatus(orderId: string, orderStatus: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE deliveries SET order_status = $2, updated_at = NOW() WHERE order_id = $1`,
+      [orderId, orderStatus],
+    );
   }
 
   async countActiveDeliveries(): Promise<number> {
