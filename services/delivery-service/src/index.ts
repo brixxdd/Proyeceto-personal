@@ -70,7 +70,6 @@ const deliveryRepository = new DeliveryRepository(dbPool);
 const kafkaProducerService = new KafkaProducer(kafkaRawProducer, idempotencyService);
 const deliveryService = new DeliveryService(
   deliveryRepository,
-  kafkaProducerService,
   pubSub,
 );
 const kafkaConsumer = new KafkaConsumer(kafkaRawConsumer, deliveryService, kafkaRawProducer);

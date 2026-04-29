@@ -1,7 +1,6 @@
 import { Delivery, DeliveryPerson, DeliveryStatus, DriverStatus, Location, VehicleType } from '../models/delivery.model';
 import { DeliveryRepository } from '../repositories/delivery.repository';
-import { KafkaProducer } from '../events/kafka.producer';
-import { RedisPubSub, deliveryStatusChannel, driverAssignedChannel, myDeliveryUpdatesChannel, newAvailableDeliveryChannel } from '../pubsub/redis.pubsub';
+import { RedisPubSub, deliveryStatusChannel, myDeliveryUpdatesChannel, newAvailableDeliveryChannel } from '../pubsub/redis.pubsub';
 import { fetchOrderDetails } from '../clients/order.client';
 import { logger } from '../utils/logger';
 import { deliveryAssignmentsTotal, activeDeliveries, availableDrivers } from '../metrics/prometheus';
@@ -11,7 +10,6 @@ const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://localhost:300
 export class DeliveryService {
   constructor(
     private readonly repo: DeliveryRepository,
-    private readonly kafkaProducer: KafkaProducer,
     private readonly pubSub: RedisPubSub,
   ) { }
 
@@ -34,16 +32,8 @@ export class DeliveryService {
 
     await this.repo.updateDriverStatus(driver.id, 'BUSY');
 
-    // Publish Kafka event
-    await this.kafkaProducer.publishDeliveryAssigned({
-      orderId,
-      deliveryPersonId: driver.id,
-      estimatedMinutes: 25,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Publish GraphQL subscription event
-    await this.pubSub.publish(driverAssignedChannel(orderId), delivery);
+    // Sync to order-service + publish GraphQL subscriptions
+    await this.updateDeliveryStatus(delivery.id, 'ASSIGNED');
 
     // Broadcast to ALL delivery people that a new delivery is available
     await this.pubSub.publish(newAvailableDeliveryChannel(), delivery);
@@ -105,29 +95,53 @@ export class DeliveryService {
     };
     const orderStatus = orderStatusMap[status];
     if (orderStatus) {
-      try {
-        const mutation = `
-          mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
-            updateOrderStatus(id: $id, status: $status) { id status }
+      const mutation = `
+        mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!) {
+          updateOrderStatus(id: $id, status: $status) { id status }
+        }
+      `;
+      const authHeaders = {
+        'x-user-id': 'a0000000-0000-0000-0000-000000000001',
+        'x-user-email': 'admin@fooddash.com',
+        'x-user-role': 'ADMIN',
+      };
+
+      // Retry loop: 3 attempts with exponential backoff
+      let lastError: unknown;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const order = await fetchOrderDetails(delivery.orderId, ORDER_SERVICE_URL, authHeaders);
+          const response = await fetch(`${ORDER_SERVICE_URL}/graphql`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+            body: JSON.stringify({
+              query: mutation,
+              variables: { id: order.id, status: orderStatus },
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
-        `;
-        const authHeaders = {
-          'x-user-id': 'a0000000-0000-0000-0000-000000000001',
-          'x-user-email': 'admin@fooddash.com',
-          'x-user-role': 'ADMIN',
-        };
-        const order = await fetchOrderDetails(delivery.orderId, ORDER_SERVICE_URL, authHeaders);
-        await fetch(`${ORDER_SERVICE_URL}/graphql`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders },
-          body: JSON.stringify({
-            query: mutation,
-            variables: { id: order.id, status: orderStatus },
-          }),
-        });
-        logger.info(`Synced delivery status ${status} → order ${order.id}`);
-      } catch (err) {
-        logger.error(`Failed to sync delivery status to order-service for delivery ${id}`, err);
+
+          const body = await response.json() as { errors?: { message: string }[] };
+          if (body.errors?.length) {
+            throw new Error(`GraphQL error: ${body.errors[0].message}`);
+          }
+
+          logger.info(`Synced delivery status ${status} → order ${order.id}`);
+          break; // Success, exit retry loop
+        } catch (err) {
+          lastError = err;
+          logger.warn(`Sync attempt ${attempt}/3 failed for delivery ${id} (order ${delivery.orderId}): ${err instanceof Error ? err.message : err}`);
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 100 * attempt)); // 100, 200, 300ms
+          }
+        }
+      }
+
+      if (lastError) {
+        logger.error(`Failed to sync delivery status to order-service for delivery ${id} after 3 attempts`, lastError);
       }
     }
 
@@ -228,7 +242,6 @@ export class DeliveryService {
   }
 
   async acceptDelivery(orderId: string, deliveryPersonId: string): Promise<Delivery> {
-    // First find the delivery by orderId to get its UUID
     const deliveryRecord = await this.repo.findDeliveryByOrderId(orderId);
     if (!deliveryRecord) {
       throw new Error(`No delivery found for order ${orderId}`);
@@ -237,7 +250,6 @@ export class DeliveryService {
       throw new Error(`Delivery ${deliveryRecord.id} is no longer available`);
     }
 
-    // Use atomic claim — DB-level check ensures only ONE driver gets the delivery
     const delivery = await this.repo.claimDelivery(deliveryRecord.id, deliveryPersonId);
     if (!delivery) {
       throw new Error(`Delivery ${deliveryRecord.id} is no longer available`);
@@ -245,18 +257,10 @@ export class DeliveryService {
 
     await this.repo.updateDriverStatus(deliveryPersonId, 'BUSY');
 
-    // Publish Kafka event so order-service can update order.status = ASSIGNED
-    await this.kafkaProducer.publishDeliveryAssigned({
-      orderId,
-      deliveryPersonId,
-      estimatedMinutes: 25,
-      timestamp: new Date().toISOString(),
-    });
+    // Sync to order-service + publish GraphQL subscriptions (updateDeliveryStatus handles both)
+    await this.updateDeliveryStatus(delivery.id, 'ASSIGNED');
 
-    // Publish GraphQL subscription events
-    await this.pubSub.publish(deliveryStatusChannel(delivery.id), delivery);
-    await this.pubSub.publish(myDeliveryUpdatesChannel(deliveryPersonId), delivery);
-
+    logger.info(`Delivery ${delivery.id} accepted by driver ${deliveryPersonId} for order ${orderId}`);
     return delivery;
   }
 
